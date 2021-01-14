@@ -1,36 +1,21 @@
 #!/usr/bin/env python3
 # -*- mode: python -*-
 
-# Re: Given an ascii graphic of a graph, drawn with _, /, \, #, X, and
+# Given an ascii graphic of a graph, drawn with _, /, \, #, X, and
 # space characters, write a .scad file to draw it using OpenSCAD 2D
 # graphics, extruded to 3D.  Lines containing characters other than
 # those are treated as text lines, and may be displayed or not
-# depending on command-line options.  In the input file, separate
-# graphs are demarcated by an `=filename` line at the start of a
-# graph's specification, and an `=` line at its end.  `.scad` is
-# appended to the given output file name.
+# depending on options.
 
-# Command-line options are in the form `value` or `opt=value` (but
-# without quotes) where opt is in the set {blob, loci, text, file}.
+# Command-line options take the form `value` or `opt=value` (less
+# quotes) where opt is in the set {blob, loci, text, file} and where
+# value is an input file name or is a color name or number (6-digit
+# hex RGB or 8-digit hex RGBA).  See README.rst for examples.
 
-# For the first three options, value should a color name or 6-digit
-# hex RGB number or 8-digit hex RGBA number (for example, Green,
-# 00FF00, Blue, 0000FF20).  Defaults for blob, loci, text are
-# 0000FF20, Red, '', which turn on pale blue blob coloring and Red
-# loci numbers, and turn off text display.  Use a value '' to turn off
-# an option; eg, loci=''.  X-marks in graph lines are drawn using
-# OpenSCAD's default brownish color.  Trace colors are taken from a
-# list of colors (colist, in function aColor) that you can change as
-# you like.
-
-# Default for `file` is 'aTestSet'.  A bare option value is treated
-# like file=value.  Eg, "$P myfile" reads data from myfile with other
-# options defaulted (where $P is program's path).
-
-# Eg, "$P bigdata text=beige loci=green blob=''" reads from bigdata,
-# draws text lines in beige, loci numbers in green, and suppresses
-# blobs.  Eg, "$P bigdata loci=red blob=00ff0010" draws loci numbers
-# in red on a pale green background.
+# Note, default for `file` is 'aTestSet', which is a file of test
+# examples.  Note, a bare value is treated like file=value.  For
+# example, "drawNodes myfile" reads data from myfile with other
+# options defaulted.
 
 from sys import argv
 
@@ -58,7 +43,7 @@ module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
-    text(label, size=textFrac*scale/2); // uncomment to see corner#
+    //text(label, size=textFrac*scale/2); // uncomment to see corner#
     intersection() {
       square(scale*[1,1], center=false);
       translate(scale*[dx,dy,0])
@@ -144,7 +129,7 @@ def process(idata, ofile):
         if cor.code in (UL, UR, HM, HX):
             cor.setConn(vvfind(cor))    # Find & set end-row
 
-    if 'e' in ofile:
+    if 'x234etc' == ofile:
         for c in corners[:25]: print(repr(c))
 
     def aColor(n): # Return nth entry from list of colors
