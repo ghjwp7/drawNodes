@@ -46,8 +46,8 @@ Running the program
 =====================
   
 When you run the program to process an input file, it will write SCAD
-code to a file or files, as named by =filename lines within the input.
-If the run is successful, you can then use openscad to display
+code to a file or files, as named by `=filename` lines within the
+input.  If the run is successful, you can then use openscad to display
 results.  For example, if ``myfile`` is a proper input file and
 contains a line ``=234`` to name an output file, you might say::
 
@@ -62,7 +62,7 @@ Command-line Options
 =====================
 
 Command-line options take the form `value` or `opt=value` where `opt`
-is in the set {`blob, loci, text, file`} and where `value` is an input
+is in the set {`node, loci, text, file`} and where `value` is an input
 file name or is a color name or number.
 
 For the first three option codes, `value` should a color name or
@@ -71,8 +71,8 @@ include::
 
   Red   BC0000   Green   00FF00   Blue   0000FF20
 
-Defaults for `blob, loci, text` are **0000FF20, Red, ''** (the latter
-an empty string) to turn on **pale blue** `blob` coloring; turn on
+Defaults for `node, loci, text` are **0000FF20, Red, ''** (the latter
+an empty string) to turn on **pale blue** `node` coloring; turn on
 **Red** `loci` numbers; and turn off `text` display.  (Generally, use
 an empty-string value **''** to turn off an option.  Eg, ``loci=''``
 would suppress loci numbering.)
@@ -88,12 +88,12 @@ Command-line Option Examples
 
 Two example command lines appear below.  The first reads from bigdata,
 draws text lines in beige, loci numbers in green, and suppresses
-blobs.  The second draws loci numbers in red on a pale green
+nodes.  The second draws loci numbers in red on a pale green
 background (since 00ff0010 is solid green, 0x00ff00, but at
 alpha=0x10) with text lines suppressed::
 
-  drawNodes.py bigdata text=beige loci=green blob=''
-  drawNodes.py bigdata loci=red blob=00ff0010
+  drawNodes.py bigdata text=beige loci=green node=''
+  drawNodes.py bigdata loci=red node=00ff0010
 
 Input File Formats
 ===============================

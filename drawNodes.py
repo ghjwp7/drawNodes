@@ -8,7 +8,7 @@
 # depending on options.
 
 # Command-line options take the form `value` or `opt=value` (less
-# quotes) where opt is in the set {blob, loci, text, file} and where
+# quotes) where opt is in the set {node, loci, text, file} and where
 # value is an input file name or is a color name or number (6-digit
 # hex RGB or 8-digit hex RGBA).  See README.rst for examples.
 
@@ -37,7 +37,7 @@ module drawV(bx, ey, ll)
   translate (scale*[bx+wf,ey+1,0]) square([wFrac*scale,scale*ll]);
 module drawH(bx, by, ll)
   translate (scale*[bx,by+wf,0])   square([scale*ll,wFrac*scale]);
-module drawBlob(x,y)
+module drawNode(x,y)
   translate (scale*[x,y,0]) square([scale*3,scale]);
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
@@ -83,7 +83,7 @@ def process(idata, ofile):
         return '?'   # No character available?
         
     # Find locations of corners etc
-    corners, blobs, xlist, chars, linn, maxy = [], [], [], [], 0, len(idata)
+    corners, nodes, xlist, chars, linn, maxy = [], [], [], [], 0, len(idata)
     for linn, l in enumerate(idata):
         if not all(c in 'X#|_ /\\' for c in l):
             chars.append((linn,l)); continue
@@ -104,7 +104,7 @@ def process(idata, ofile):
             elif c=='#':
                 hcode = HX if pc=='#' else HM
                 corners.append(Junction(num, linn,col, hcode)) # Hashmark
-                blobs.append(corners[num])
+                nodes.append(corners[num])
             elif c=='X':
                 corners.append(Junction(num, linn,col,XM)) # Xmark
                 xlist.append(corners[num])
@@ -168,12 +168,12 @@ def process(idata, ofile):
 
         fout.write (heading(ofile)) # Write some drawing modules
         
-        if options['blob']:     # Open blobs color block?
-            fout.write (f'  color("{colorFix(options["blob"])}") linear_extrude(height=1)' + ' {\n')
-            for b in blobs:
+        if options['node']:     # Open nodes color block?
+            fout.write (f'  color("{colorFix(options["node"])}") linear_extrude(height=1)' + ' {\n')
+            for b in nodes:
                 if b.code == HM:
-                    fout.write (f'    drawBlob({b.col}, {maxy-b.row});\n')
-            fout.write ('  }\n')    # Close drawBlob's color block
+                    fout.write (f'    drawNode({b.col}, {maxy-b.row});\n')
+            fout.write ('  }\n')    # Close drawNode's color block
 
         if options['text']:     # Open show-loci-numbers color block?
             fout.write (f'  color(c="{colorFix(options["text"])}") linear_extrude(height=1)' + ' {\n')
@@ -187,7 +187,7 @@ def process(idata, ofile):
         if options['loci']:
             # Open show-loci-numbers color block
             fout.write (f'  color(c="{colorFix(options["loci"])}") linear_extrude(height=1.2)' + ' {\n')
-            for b in blobs:   # Display loci numbers in selected color
+            for b in nodes:   # Display loci numbers in selected color
                 if b.conn:
                     fout.write (f'    drawChar({b.col+0.2}, {maxy-b.row+0.1}, "{loci}");\n')
                     loci += 1
@@ -197,9 +197,9 @@ def process(idata, ofile):
                 fout.write (f'  linear_extrude(height=1) drawChar({x.col}, {maxy-x.row}, "X");\n')
 
         colorNum = 1                # Skip first two colors at outset
-        for b in blobs:   # Do traces from tops of blobs                
+        for b in nodes:   # Do traces from tops of nodes                
             for d in b.conn:
-                # Only draw traces from tops of blobs
+                # Only draw traces from tops of nodes
                 if d.num > b.num: continue
                 # Start a current-trace color-block
                 colorNum += 1
@@ -213,8 +213,8 @@ def process(idata, ofile):
         fout.write ('}\ndrawStuff();\n')
 #======================================================================
 # Set up default options to number the loci in red; suppress text;
-# paint blob bodies in a pale blue; and by default read from t1-data.
-options = { 'loci':'Red', 'text':'', 'blob':'0000FF20', 'file':'aTestSet'}
+# paint node bodies in a pale blue; and by default read from t1-data.
+options = { 'loci':'Red', 'text':'', 'node':'0000FF20', 'file':'aTestSet'}
 arn, idata = 0, []
 while (arn := arn+1) < len(argv):
     if '=' in argv[arn]:
