@@ -45,7 +45,7 @@ Running the program
 =====================
   
 When you run the program to process an input file, it will write SCAD
-code to a file or files, as named by `=filename` lines within the
+code to a file or files, as named by *=filename* lines within the
 input.  If the run is successful, you can then use openscad to display
 results.  For example, if ``myfile`` is a proper input file and
 contains a line ``=234`` to name an output file, you might say::
@@ -60,25 +60,25 @@ file, see the sections `Automatic updates in OpenSCAD`_ and
 Command-line Options
 =====================
 
-Command-line options take the form `value` or `opt=value` where `opt`
-is in the set {`node, loci, text, file`} and where `value` is an input
+Command-line options take the form *value* or *opt=value* where *opt*
+is in the set {*node, loci, text, file*} and where *value* is an input
 file name or is a color name or number.
 
-For the first three option codes, `value` should be a color name or
+For the first three option codes, *value* should be a color name or
 6-digit hex RGB number or 8-digit hex RGBA number.  Color examples
 include::
 
   Red   BC0000   Green   00FF00   Blue   0000FF20
 
-Defaults for `node, loci, text` are **0000FF20, Red, ''** (the latter
-an empty string) to turn on **pale blue** `node` coloring; turn on
-**Red** `loci` numbers; and turn off `text` display.  (Generally, use
+Defaults for *node, loci, text* are **0000FF20, Red, ''** (the latter
+an empty string) to turn on **pale blue** *node* coloring; turn on
+**Red** *loci* numbers; and turn off *text* display.  (Generally, use
 an empty-string value **''** to turn off an option.  Eg, ``loci=''``
 would suppress loci numbering.)
 
-The default value for the `file` option is ``aTestSet``, which is a
+The default value for the *file* option is ``aTestSet``, which is a
 file of test examples.  Note, a bare value is treated as a file name,
-`ie`, is treated like file=value.  For example, ``drawNodes.py
+*ie*, is treated like file=value.  For example, ``drawNodes.py
 myfile`` reads data from myfile with other options defaulted.
 
 
@@ -97,11 +97,11 @@ alpha=0x10) with text lines suppressed::
 Input File Formats
 ===============================
 
-In the input file, separate graphs are demarcated by an `=` line at
-each section end, and an `=f` line at each section start (where `f` is
-some output file name, to which `.scad` will be appended).  See file
+In the input file, separate graphs are demarcated by an *=* line at
+each section end, and an *=f* line at each section start (where *f* is
+some output file name, to which *.scad* will be appended).  See file
 ``aTestSet`` for examples of input file format.  Generally, the lines
-between the opening `=f` line and the closing `=` line should
+between the opening *=f* line and the closing *=* line should
 represent a graph using any of ``/ # \ _ X`` and space to draw the
 graph.  Lines that have characters other than these are treated as
 lines of text.  If no text color is set, text lines are ignored.  But
@@ -139,7 +139,7 @@ Trace colors are taken from a list of colors (``colist``, in function
 Graph Parsing Limitations
 =========================
 
-An example in ``aTestSet`` called `234etc` has some traces that
+An example in ``aTestSet`` called *234etc* has some traces that
 ``drawNodes`` doesn't handle correctly.  The parsing method used in the
 program is simplistic; it is ok for many ascii graphs but at present
 fails when a trace goes down, then left or right, then down again,
