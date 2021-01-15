@@ -147,7 +147,7 @@ because the second corner's / or \\ is in a different line than the
 first corner's / or \\ and the current version only looks in current
 line.  This may or may not be simple to fix.  In addition, hairpin
 turns (eg, ``_/\_``) are not properly treated, although slightly wider
-turns work ok. See example 235long.
+turns work ok. See example *235long*.
 
 How to make a .png output
 ==========================
@@ -182,14 +182,26 @@ the result by itself.
 Automatically running ``drawNodes`` upon changes to your input file
 ========================================================================
 
+.. _ghjwp7 plastics repository:
+   https://github.com/ghjwp7/plastics/blob/master/exec-on-change
+
 During input file development, it may be convenient to automatically
 run ``drawNodes`` when your file changes.  To do so: Obtain and
-install the ``exec-on-change`` shell script and its requirements.
-Then a command as below will automatically run ``drawNodes`` upon
-changes to ``myfile`` (after which OpenSCAD can re-render results, as
-above).  Add any desired options within the quoted command.  The
-``exec-on-change`` URL is
-https://github.com/ghjwp7/plastics/blob/master/exec-on-change ::
+install the ``exec-on-change`` shell script and its requirements, as
+found in my `ghjwp7 plastics repository`_.  Then a command as below
+will automatically run ``drawNodes`` upon changes to ``myfile`` (after
+which OpenSCAD can re-render results, as above).  Add any desired
+options within the quoted command.  ::
 
-     exec-on-change myfile  'drawNodes.py myfile' &
+     exec-on-change  myfile  'drawNodes.py myfile' &
 
+If you modify ``drawNodes`` to try different trace colors, you could
+enter this command besides::
+
+     exec-on-change  drawNodes.py  'drawNodes.py myfile' &
+
+Note, if you run ``exec-on-change`` in the foreground (*ie*, without
+the ``&`` after the command) it is easy to terminate, via *ctrl-c*.
+If it is backgrounded and you wish to terminate it, use ``ps`` to find
+the process numbers of ``exec-on-change`` and ``inotifywait``, and
+kill both of them.
