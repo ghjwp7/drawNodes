@@ -29,7 +29,7 @@ The rest of this file has the following sections:
  • `Graph Parsing limitations`_
  • `How to make a .png output`_ with openscad results`_
  • `Automatic updates in OpenSCAD`_ 
- • `Automatically running drawNodes`_
+ • `Automatically running drawNodes upon changes to your input file`_
 
 Software requirements
 =====================
@@ -55,7 +55,7 @@ contains a line ``=234`` to name an output file, you might say::
 
 [For two ways to speed up seeing the effects of changes to your input
 file, see the sections `Automatic updates in OpenSCAD`_ and
-`Automatically running drawNodes`_ below.]
+`Automatically running drawNodes upon changes to your input file`_ below.]
 
 Command-line Options
 =====================
