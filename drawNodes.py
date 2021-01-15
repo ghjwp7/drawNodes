@@ -205,7 +205,7 @@ def process(idata, ofile):
             fout.write ('  }\n')    # Close loci-numbering color block
 
             for x in xlist:
-                fout.write (f'  linear_extrude(height=1) drawChar({x.col}, {maxy-x.row}, "X");\n')
+                fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
 
         colorNum = 1                # Skip first two colors at outset
         for b in nodes:   # Do traces from tops of nodes                

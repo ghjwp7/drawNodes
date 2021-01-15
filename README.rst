@@ -42,7 +42,7 @@ Software requirements
  • Install a picture viewer (such as gpicview, eog, xv, etc)
 
 Running the program
-=====================
+====================
   
 When you run the program to process an input file, it will write SCAD
 code to a file or files, as named by *=filename* lines within the
