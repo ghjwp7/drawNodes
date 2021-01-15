@@ -65,7 +65,7 @@ Command-line options take the form `value` or `opt=value` where `opt`
 is in the set {`node, loci, text, file`} and where `value` is an input
 file name or is a color name or number.
 
-For the first three option codes, `value` should a color name or
+For the first three option codes, `value` should be a color name or
 6-digit hex RGB number or 8-digit hex RGBA number.  Color examples
 include::
 
@@ -104,12 +104,18 @@ some output file name, to which `.scad` will be appended).  See file
 ``aTestSet`` for examples of input file format.  Generally, the lines
 between the opening `=f` line and the closing `=` line should
 represent a graph using any of ``/ # \ _ X`` and space to draw the
-graph, with the stipulation that three consecutive ``#`` characters
-represent a graph node.  Lines that have characters other than those
-mentioned are treated as lines of text.  If a color is set for the
-``text=color`` command-line option, then along with the graph drawing,
-text lines will appear in the output.  If no text color is set, text
-lines are ignored.  Here is an example, with default options::
+graph.  Lines that have characters other than these are treated as
+lines of text.  If no text color is set, text lines are ignored.  But
+if a color is set via the ``text=color`` command-line option, text
+lines will appear in the output along with the graph drawing.
+
+Note, *k* consecutive ``#`` characters represent a digraph node of
+width *k*, which may have up to *k* output loci atop the node, and up
+to *k* input loci on the underside.  In the following sample of
+program input and resulting output, run with default options, the
+green trace represents an edge *from* 0 on the first node, *to* 1 on
+the same node; and the blue trace is similar, running *from* 2 *to* 3
+on the second node::
 
     =235small
          __________
@@ -121,7 +127,7 @@ lines are ignored.  Here is an example, with default options::
     =
 
 .. image:: 235small.png
-   :scale: 50%
+   :scale: 35%
 
 X-marks and Trace Colors
 ========================

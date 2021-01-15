@@ -37,8 +37,15 @@ module drawV(bx, ey, ll)
   translate (scale*[bx+wf,ey+1,0]) square([wFrac*scale,scale*ll]);
 module drawH(bx, by, ll)
   translate (scale*[bx,by+wf,0])   square([scale*ll,wFrac*scale]);
-module drawNode(x,y)
-  translate (scale*[x,y,0]) square([scale*3,scale]);
+module round2(radi, yfar) {
+   circle(radi); translate([0,yfar,0]) circle(radi);
+}
+module drawNode(x,y, xfar) {
+  ss=scale/4;  yf=scale/2;
+  translate (scale*[x+1/4,y+1/4,0]) hull() {
+      round2(ss,yf); translate([scale*(xfar-1/2),0,0]) round2(ss,yf);
+  }
+}
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
 module drawCorner(x,y,dx,dy, label="")
@@ -109,6 +116,7 @@ def process(idata, ofile):
                 corners.append(Junction(num, linn,col,XM)) # Xmark
                 xlist.append(corners[num])
             pc = c
+        corners.append(Junction(0,0,0,0)) # Need extra node for xfar testing
 
     def hhfind(cor):
         for c in corners[1+cor.num:]:
@@ -172,7 +180,10 @@ def process(idata, ofile):
             fout.write (f'  color("{colorFix(options["node"])}") linear_extrude(height=1)' + ' {\n')
             for b in nodes:
                 if b.code == HM:
-                    fout.write (f'    drawNode({b.col}, {maxy-b.row});\n')
+                    xfar = 1
+                    while corners[b.num+xfar].col==b.col+xfar and corners[b.num+xfar].code==HX:
+                        xfar += 1
+                    fout.write (f'    drawNode({b.col}, {maxy-b.row},{xfar});\n')
             fout.write ('  }\n')    # Close drawNode's color block
 
         if options['text']:     # Open show-loci-numbers color block?
