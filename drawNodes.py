@@ -239,7 +239,7 @@ with open(options['file'], 'r') as fin:
             idata, ofile = [], a[1:].rstrip()
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
-                if a and a[0]=='=':   # Detect closing =
+                if a and a=='=':   # Detect closing =
                     process(idata, ofile)
                     break
                 idata.append(a)

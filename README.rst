@@ -20,17 +20,16 @@ command-line options.
 
 The rest of this file has the following sections:
 
- • Software requirements
- • Running the program
- • Command-line Options
- • Command-line Options Examples
- • Input file formats
- • X-marks and Trace Colors
- • Graph Parsing limitations
- • How to make a .png output with openscad results
- • Automatic updates in OpenSCAD 
- • Automatically running ``drawNodes`` upon changes to your input file
-
+ • `Software requirements`_
+ • `Running the program`_
+ • `Command-line Options`_
+ • `Command-line Option Examples`_
+ • `Input file formats`_
+ • `X-marks and Trace Colors`_
+ • `Graph Parsing limitations`_
+ • `How to make a .png output`_ with openscad results`_
+ • `Automatic updates in OpenSCAD`_ 
+ • `Automatically running drawNodes`_
 
 Software requirements
 =====================
@@ -55,8 +54,8 @@ contains a line ``=234`` to name an output file, you might say::
     openscad 234.scad &
 
 [For two ways to speed up seeing the effects of changes to your input
-file, see the sections *Automatic updates in OpenSCAD* and
-*Automatically running drawNodes* below.]
+file, see the sections `Automatic updates in OpenSCAD`_ and
+`Automatically running drawNodes`_ below.]
 
 Command-line Options
 =====================
@@ -172,11 +171,13 @@ If OpenSCAD's ``Design / Automatic-Reload-and-Preview`` option is on,
 then once you've started OpenSCAD for a given file, it will notice
 whenever that ``.scad`` file changes, and will re-render the image.
 Note, if you modify ``.scad`` code in OpenSCAD's Editor window, you
-may need to press ``F5`` to re-render.  However, if you use OpenSCAD's
+may need to press ``F5`` to re-render.  If you use OpenSCAD's
 Customizer to change and enter some parameter values -- such as
 ``wFrac`` to control trace width, or ``scale`` to control overall
-sizing, or ``textFrac`` to control text size -- OpenSCAD should update
+sizing, or ``textFrac`` to control text size -- OpenSCAD might update
 the result by itself.
+
+.. _`Automatically running drawNodes`:
 
 Automatically running ``drawNodes`` upon changes to your input file
 ========================================================================
@@ -185,9 +186,9 @@ During input file development, it may be convenient to automatically
 run ``drawNodes`` when your file changes.  To do so: Obtain and
 install the ``exec-on-change`` shell script and its requirements.
 Then a command as below will automatically run ``drawNodes`` upon
-changes to ``myfile`` (after which OpenSCAD can re-render results, per
-previous section).  Add any desired options within the quoted command.
-The ``exec-on-change`` URL is
+changes to ``myfile`` (after which OpenSCAD can re-render results, as
+above).  Add any desired options within the quoted command.  The
+``exec-on-change`` URL is
 https://github.com/ghjwp7/plastics/blob/master/exec-on-change ::
 
      exec-on-change myfile  'drawNodes.py myfile' &
