@@ -1,5 +1,6 @@
-2*.scad
+*.scad
 bigdata
 t1-*
-*#
+*#*
+*~
 ex

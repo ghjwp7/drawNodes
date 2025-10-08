@@ -47,8 +47,53 @@ module drawNode(x,y, xfar) {
       round2(ss,yf); translate([scale*(xfar-1/2),0,0]) round2(ss,yf);
   }
 }
+module drawNodeOutline(x,y, xfar, thickness) {
+  ss=scale/4;  yf=scale/2;
+  translate (scale*[x+1/4,y+1/4,0])
+    difference() {
+      hull() {
+        round2(ss+thickness,yf);
+        translate([scale*(xfar-1/2),0,0]) round2(ss+thickness,yf);
+      }
+      hull() {
+        round2(ss,yf);
+        translate([scale*(xfar-1/2),0,0]) round2(ss,yf);
+      }
+    }
+}
 module drawComplement(x,y)
   translate (scale*[x+0.5,y+1+wFrac,0]) circle(d=2*wFrac*scale);
+module drawArrow(x, y) {
+  // Draw upward-pointing triangle at position (x, y)
+  // y is the bottom of the node, arrow points up into it
+  // Base is 1.5x wider than line width for visibility
+  translate(scale*[x, y, 0])
+    polygon([[0, 0], [-1.5*wFrac*scale, -wFrac*scale], [1.5*wFrac*scale, -wFrac*scale]]);
+}
+module drawXorSymbol(x, y, xfar) {
+  // Draw circled plus (XOR symbol) in center of node
+  // x, y is bottom-left of node, xfar is node width
+  cx = x + xfar/2;
+  cy = y + 0.5;
+  radius = 0.3;
+  ringThickness = wFrac/3;
+  barWidth = wFrac/3;
+  barHalfLen = 0.2;
+
+  translate(scale*[cx, cy, 0]) {
+    // Circle ring
+    difference() {
+      circle(r=scale*radius);
+      circle(r=scale*(radius-ringThickness));
+    }
+    // Horizontal bar of +
+    translate(scale*[-barHalfLen, -barWidth/2, 0])
+      square(scale*[2*barHalfLen, barWidth]);
+    // Vertical bar of +
+    translate(scale*[-barWidth/2, -barHalfLen, 0])
+      square(scale*[barWidth, 2*barHalfLen]);
+  }
+}
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
 module drawCorner(x,y,dx,dy, label="")
@@ -239,6 +284,12 @@ def process(idata, ofile):
         drawH(c, d.col) # Draw to end-column, if ok
         drawV(c, d.row) # Draw to end-row, if ok
         drawn[c.canon(d)] = 1
+
+        # Draw arrowhead if d is a destination node (HM or HX, not XM)
+        if d.code >= HM:  # Node destination
+            # Arrow at bottom edge of node, centered on trace (col+0.5 due to wf offset)
+            fout.write(f'    drawArrow({c.col+0.5}, {maxy-d.row});\n')
+
         if d.code < CL:
             for e in d.conn:
                 colorTrace(d, e)
@@ -326,6 +377,16 @@ def process(idata, ofile):
 
         fout.write (heading(ofile)) # Write some drawing modules
 
+        # Draw node outlines in black (before filled nodes so outline shows)
+        fout.write ('  color("Black") linear_extrude(height=1) {\n')
+        for b in nodes:
+            if b.code == HM:
+                xfar = 1
+                while corners[b.num+xfar].col==b.col+xfar and corners[b.num+xfar].code==HX:
+                    xfar += 1
+                fout.write (f'    drawNodeOutline({b.col}, {maxy-b.row},{xfar},wFrac);\n')
+        fout.write ('  }\n')    # Close node outline color block
+
         if options['node']:     # Open nodes color block?
             fout.write (f'  color("{colorFix(options["node"])}") linear_extrude(height=1)' + ' {\n')
             for b in nodes:
@@ -335,6 +396,16 @@ def process(idata, ofile):
                         xfar += 1
                     fout.write (f'    drawNode({b.col}, {maxy-b.row},{xfar});\n')
             fout.write ('  }\n')    # Close drawNode's color block
+
+        # Draw XOR symbols (circled plus) in center of each node
+        fout.write ('  color("Black") linear_extrude(height=1.1) {\n')
+        for b in nodes:
+            if b.code == HM:
+                xfar = 1
+                while corners[b.num+xfar].col==b.col+xfar and corners[b.num+xfar].code==HX:
+                    xfar += 1
+                fout.write (f'    drawXorSymbol({b.col}, {maxy-b.row},{xfar});\n')
+        fout.write ('  }\n')    # Close XOR symbol color block
 
         if options['text']:     # Open show-loci-numbers color block?
             fout.write (f'  color(c="{colorFix(options["text"])}") linear_extrude(height=1)' + ' {\n')
@@ -354,9 +425,9 @@ def process(idata, ofile):
                     loci += 1
             fout.write ('  }\n')    # Close loci-numbering color block
 
-            # Draw X marks at input positions
-            for x in xlist:
-                fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
+        # Draw X marks at input positions (always drawn, not dependent on loci option)
+        for x in xlist:
+            fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
 
         # Draw edge labels in black
         if edges:
@@ -408,9 +479,9 @@ def process(idata, ofile):
         # Close drawStuff module and invoke it
         fout.write ('}\ndrawStuff();\n')
 #======================================================================
-# Set up default options to number the loci in red; suppress text;
+# Set up default options to suppress loci numbers; suppress text;
 # paint node bodies in a pale blue; and by default read from t1-data.
-options = { 'loci':'Red', 'text':'', 'node':'0000FF20', 'file':'aTestSet'}
+options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'aTestSet'}
 arn, idata = 0, []
 while (arn := arn+1) < len(argv):
     if '=' in argv[arn]:
