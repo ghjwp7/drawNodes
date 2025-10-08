@@ -19,6 +19,7 @@
 
 from sys import argv
 from collections import deque
+import subprocess
 
 def heading(ofile):
     import datetime
@@ -114,6 +115,101 @@ module drawStuff() {
 def colorFix(h):  # Put # at front of color-value hex-digits string
     try:  x = int(h,16); return '#'+h
     except: return h
+#==============================================================
+def calculate_camera_params(bbox, border=20, scale=10, target_imgsize=None):
+    """Calculate camera position and image size from bounding box
+
+    Args:
+        bbox: (min_col, max_col, min_row, max_row, maxy)
+        border: Border padding as percentage (default 20%)
+        scale: OpenSCAD scale factor (default 10)
+        target_imgsize: Optional (width, height) to fit drawing into with minimum border
+    """
+    min_col, max_col, min_row, max_row, maxy = bbox
+
+    # Calculate center point in OpenSCAD coordinates
+    center_x = (min_col + max_col) / 2 * scale
+    center_y = (maxy - (min_row + max_row) / 2) * scale
+
+    # Calculate drawing dimensions in OpenSCAD units
+    width = (max_col - min_col) * scale
+    height = (max_row - min_row) * scale
+
+    # Add border padding
+    padded_width = width * (1 + border / 100)
+    padded_height = height * (1 + border / 100)
+
+    if target_imgsize:
+        # When imgsize is specified, calculate z_height to fit with minimum border
+        img_width, img_height = target_imgsize
+
+        # Compare aspect ratios to determine limiting dimension
+        drawing_aspect = padded_width / padded_height if padded_height > 0 else 1
+        image_aspect = img_width / img_height if img_height > 0 else 1
+
+        if drawing_aspect > image_aspect:
+            # Drawing is relatively wider - width is limiting factor
+            z_height = padded_width
+        else:
+            # Drawing is relatively taller - height is limiting factor
+            z_height = padded_height * image_aspect
+
+        return (center_x, center_y, z_height), target_imgsize
+    else:
+        # Auto-calculate imgsize with border percentage applied to each dimension
+
+        # Calculate border as percentage (applies to each dimension independently)
+        border_fraction = border / 100
+
+        # Add border to each dimension
+        padded_width = width * (1 + border_fraction)
+        padded_height = height * (1 + border_fraction)
+
+        # Calculate imgsize at 10px per unit
+        img_width = int(padded_width * 10)
+        img_height = int(padded_height * 10)
+
+        # Round to nearest 50 pixels
+        img_width = ((img_width + 25) // 50) * 50
+        img_height = ((img_height + 25) // 50) * 50
+
+        # z_height is the larger padded dimension to ensure everything fits
+        z_height = max(padded_width, padded_height)
+
+        return (center_x, center_y, z_height), (img_width, img_height)
+
+def generate_png(ofile, imgsize, camera):
+    """Generate PNG from SCAD file using OpenSCAD CLI"""
+    if not imgsize or not camera:
+        print(f"Warning: Missing metadata for {ofile}, skipping PNG generation")
+        return
+
+    w, h = imgsize
+    x, y, z = camera
+
+    cmd = [
+        'openscad',
+        '-o', f'{ofile}.png',
+        '--imgsize', f'{w},{h}',
+        '--camera', f'{x},{y},{z},{x},{y},0',
+        '--autocenter',
+        '--colorscheme', 'Cornfield',
+        f'{ofile}.scad'
+    ]
+
+    try:
+        print(f"Generating {ofile}.png...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode == 0:
+            print(f"Successfully generated {ofile}.png")
+        else:
+            print(f"Error generating {ofile}.png: {result.stderr}")
+    except FileNotFoundError:
+        print("Error: openscad command not found. Please install OpenSCAD.")
+    except subprocess.TimeoutExpired:
+        print(f"Error: OpenSCAD timed out generating {ofile}.png")
+    except Exception as e:
+        print(f"Error generating {ofile}.png: {e}")
 #==============================================================
 class Junction:
     cc = ['UR','LR','UL','LL','CL','XM','HM','HX']
@@ -478,10 +574,27 @@ def process(idata, ofile):
 
         # Close drawStuff module and invoke it
         fout.write ('}\ndrawStuff();\n')
+
+    # Calculate bounding box from all corners
+    if corners:
+        min_col = min(c.col for c in corners if c.code != 0)
+        max_col = max(c.col for c in corners if c.code != 0)
+        min_row = min(c.row for c in corners if c.code != 0)
+        max_row = max(c.row for c in corners if c.code != 0)
+
+        # Add padding for overhanging elements (nodes, labels, circles)
+        min_col = min_col - 1  # Left padding for nodes/labels
+        max_col = max_col + 4  # Right padding (nodes extend right + labels)
+        min_row = min_row - 1  # Bottom padding (labels below nodes)
+        max_row = max_row + 2  # Top padding (labels above + complement circles)
+    else:
+        min_col = max_col = min_row = max_row = 0
+
+    return (min_col, max_col, min_row, max_row, maxy)
 #======================================================================
 # Set up default options to suppress loci numbers; suppress text;
 # paint node bodies in a pale blue; and by default read from t1-data.
-options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'aTestSet'}
+options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'aTestSet', 'png':''}
 arn, idata = 0, []
 while (arn := arn+1) < len(argv):
     if '=' in argv[arn]:
@@ -493,9 +606,60 @@ with open(options['file'], 'r') as fin:
         # Read text for one diagram; send that text to process().
         if a[0]=='=':           # Detect opening =
             idata, ofile = [], a[1:].rstrip()
+            imgsize, camera, border = None, None, None  # Metadata for PNG generation
+
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
                 if a and a=='=':   # Detect closing =
-                    process(idata, ofile)
+                    # Process the SCAD file (file is fully written when this returns)
+                    bbox = process(idata, ofile)
+
+                    # Generate PNG if requested
+                    if options['png']:
+                        # Use default border if not specified
+                        final_border = border if border is not None else 20
+
+                        # Calculate camera/imgsize from bounding box
+                        # Pass imgsize if specified so z_height can be calculated to fit
+                        calc_camera, calc_imgsize = calculate_camera_params(
+                            bbox, border=final_border, target_imgsize=imgsize
+                        )
+
+                        # Use explicit camera if provided, otherwise use calculated
+                        final_camera = camera if camera else calc_camera
+                        final_imgsize = imgsize if imgsize else calc_imgsize
+
+                        # Print calculated values for user reference
+                        if border is None:
+                            print(f"Calculated border: @border={final_border}")
+                        if not camera:
+                            print(f"Calculated camera: @camera={calc_camera[0]:.1f},{calc_camera[1]:.1f},{calc_camera[2]:.1f}")
+                        if not imgsize:
+                            print(f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}")
+
+                        generate_png(ofile, final_imgsize, final_camera)
                     break
-                idata.append(a)
+                elif a.startswith('@imgsize='):
+                    # Parse @imgsize=800,250
+                    parts = a[9:].split(',')
+                    if len(parts) == 2:
+                        try:
+                            imgsize = (int(parts[0]), int(parts[1]))
+                        except ValueError:
+                            print(f"Warning: Invalid imgsize format: {a}")
+                elif a.startswith('@camera='):
+                    # Parse @camera=150,50,250
+                    parts = a[8:].split(',')
+                    if len(parts) == 3:
+                        try:
+                            camera = (float(parts[0]), float(parts[1]), float(parts[2]))
+                        except ValueError:
+                            print(f"Warning: Invalid camera format: {a}")
+                elif a.startswith('@border='):
+                    # Parse @border=20
+                    try:
+                        border = float(a[8:])
+                    except ValueError:
+                        print(f"Warning: Invalid border format: {a}")
+                else:
+                    idata.append(a)
