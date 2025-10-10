@@ -1,0 +1,48 @@
+=4_2_1_progression
+     ________________________      
+   _/_________________       \     
+ _/_|__________       \      |     
+/ | |       ___\______|_     |     
+| | |  __  /  _|____  | \    |     
+| | | /  \ | / |    \ | |    |
+| | | |  | | | |    | | |    | | |
+| | f c  | | c f    | b e    | e b    a+c=b e	
+f+b      c+e      x+c      x+f        a+e=f c	
+    a d      d a      c f      f c    b+d=c f	
+a+c      d+f      x+d      x+a        b+f=a d	
+    b e      e b      d a      a d    c+a=b e	
+b+d      e+a      x+e      x+b        c+e=d a	
+    c f      f c      e b      b e    d+b=c f	
+c+e      f+b      x+f      x+c        d+f=e b	
+    d a      a d      f c      c f    e+a=f c	
+d+f      a+c      x+a      x+d        e+c=d a	
+    e b      b e      a d      d a    f+b=a d	
+e+a      b+d      x+b      x+e        f+d=e b	
+    f c      c f      b e      e b    x+n=n -n
+f+b      c+e      x+c      x+f        
+=
+=4_2_1_progression_tight
+   ____________________      
+  /  _____________     \     
+ _|_/_______      \    |     
+/ | |     __\_____|    |     
+| | | _  /  |___  |\   |     
+| | |/ \ | /|   \ ||   |     
+| | || | | ||   | ||   |     
+| | || | | ||   | ||   |     
+| | fc | | cf   | be   | eb    a+c=b e	
+f+b    c+e    x+c    x+f       a+e=f c	
+    ad     da     cf     fc    b+d=c f	
+a+c    d+f    x+d    x+a       b+f=a d	
+    be     eb     da     ad    c+a=b e	
+b+d    e+a    x+e    x+b       c+e=d a	
+    cf     fc     eb     be    d+b=c f	
+c+e    f+b    x+f    x+c       d+f=e b	
+    da     ad     fc     cf    e+a=f c	
+d+f    a+c    x+a    x+d       e+c=d a	
+    eb     be     ad     da    f+b=a d	
+e+a    b+d    x+b    x+e       f+d=e b	
+    fc     cf     be     eb    x+n=n -n
+f+b    c+e    x+c    x+f        
+=
+
