@@ -163,6 +163,16 @@ class Path:
 
     def draw(self, fout, maxy, CL, VL):
         """Draw this complete path"""
+        # If path has a start_row, draw initial segment from output row to first junction
+        if self.start_row is not None and len(self.junctions) > 0:
+            first_c, first_d = self.junctions[0]
+            # The first junction (first_c) should be at or before the output row
+            # If it's before (row < start_row), draw initial vertical segment
+            if first_c.row < self.start_row:
+                base = min(maxy-first_c.row, maxy-self.start_row)
+                length = abs(first_c.row - self.start_row)
+                fout.write(f'    drawV({self.start_col}, {base}, {length});\n')
+
         for i, (c, d) in enumerate(self.junctions):
             # Check if previous segment was horizontal at the same row
             prev_was_horiz_same_row = False
