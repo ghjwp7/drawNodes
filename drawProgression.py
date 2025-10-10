@@ -164,31 +164,31 @@ class Path:
     def draw(self, fout, maxy, CL, VL):
         """Draw this complete path"""
         for i, (c, d) in enumerate(self.junctions):
+            # Check if previous segment was horizontal at the same row
+            prev_was_horiz_same_row = False
+            if i > 0:
+                prev_c, prev_d = self.junctions[i - 1]
+                prev_was_horiz_same_row = (prev_c.col != prev_d.col and prev_c.row == prev_d.row and prev_d.row == c.row)
+
             # For horizontal segments, swap the corner codes at each end
             # so they curve toward the horizontal line instead of away from it
             if c.col != d.col and c.row == d.row:
                 # Horizontal segment - use swapped corner codes
-                # Draw corner at position c using d's corner code
-                if c.code < CL:
+                # Draw corner at position c using d's corner code (skip if previous segment already drew it)
+                if c.code < CL and not prev_was_horiz_same_row:
                     dy, dx = d.code&1, d.code//2
                     fout.write(f'    drawCorner({c.col}, {maxy-c.row}, {dx},{dy}, "{c.num}");\n')
                 # Draw the horizontal segment
                 base = min(c.col, d.col)
                 fout.write(f'    drawH({base+1}, {maxy-c.row}, {abs(c.col-d.col)-1});\n')
-                # Draw corner at position d using c's corner code (only if it's the last segment or next is not horizontal at same row)
-                is_last = (i == len(self.junctions) - 1)
-                if not is_last:
-                    next_c, next_d = self.junctions[i + 1]
-                    next_is_horiz_same_row = (next_c.col != next_d.col and next_c.row == next_d.row and next_c.row == c.row)
-                else:
-                    next_is_horiz_same_row = False
-
-                if not next_is_horiz_same_row and d.code < CL:
+                # Draw corner at position d using c's corner code (always draw for horizontal segments)
+                if d.code < CL:
                     dy, dx = c.code&1, c.code//2
                     fout.write(f'    drawCorner({d.col}, {maxy-d.row}, {dx},{dy}, "{d.num}");\n')
             else:
-                # Vertical segment or same position - draw normally
-                if c.code < CL:
+                # Vertical segment or same position
+                # Only draw corner at position c if it wasn't already drawn by previous horizontal segment
+                if c.code < CL and not prev_was_horiz_same_row:
                     dy, dx = c.code&1, c.code//2
                     fout.write(f'    drawCorner({c.col}, {maxy-c.row}, {dx},{dy}, "{c.num}");\n')
 
