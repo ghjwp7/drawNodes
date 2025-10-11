@@ -25,6 +25,12 @@ def heading(ofile):
     import datetime
     dt = datetime.datetime.today().strftime('%Y-%m-%d  %H:%M:%S')
     return f'// File {ofile}, generated {dt} by drawNodes' + '''
+/* [Label Colors] */
+// Color for edge labels
+label_color = "Black";
+// Color for label halo/outline
+label_halo_color = "White";
+
 // Number of sides for round things
 $fn=31;
 // Width as fraction of scale
@@ -97,6 +103,10 @@ module drawXorSymbol(x, y, xfar) {
 }
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
+module drawCharHalo(x,y,t) {
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+}
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
     //text(label, size=textFrac*scale/2); // uncomment to see corner#
@@ -202,6 +212,24 @@ def generate_png(ofile, imgsize, camera):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode == 0:
             print(f"Successfully generated {ofile}.png")
+
+            # Make background transparent using ImageMagick
+            # Cornfield colorscheme uses RGB(255,255,229) as background
+            # Use -fuzz to handle anti-aliasing at edges
+            convert_cmd = [
+                'convert',
+                f'{ofile}.png',
+                '-fuzz', '5%',
+                '-transparent', 'rgb(255,255,229)',
+                f'{ofile}.png'
+            ]
+
+            print(f"Making background transparent...")
+            convert_result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=30)
+            if convert_result.returncode == 0:
+                print(f"Successfully created transparent background for {ofile}.png")
+            else:
+                print(f"Warning: Could not make background transparent: {convert_result.stderr}")
         else:
             print(f"Error generating {ofile}.png: {result.stderr}")
     except FileNotFoundError:
@@ -236,12 +264,19 @@ class Edge:
         self.source_node = source_node
         self.dest_node = dest_node
 
-    def draw_labels(self, fout, maxy):
-        """Draw label at both ends of the edge"""
+    def draw_labels(self, fout, maxy, layer='label'):
+        """Draw label at both ends of the edge
+
+        Args:
+            layer: 'halo' for white background layer, 'label' for actual label
+        """
+        # Use larger text for halo, normal text for label
+        draw_func = 'drawCharHalo' if layer == 'halo' else 'drawChar'
+
         # Draw at output (just above source node at row+1.3)
-        fout.write(f'    drawChar({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
+        fout.write(f'    {draw_func}({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
         # Draw at input (at input row position, same level as X marks)
-        fout.write(f'    drawChar({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
+        fout.write(f'    {draw_func}({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
 
     def __repr__(self):
         return f'Edge({self.label}: ({self.start_row},{self.start_col}) -> ({self.end_row},{self.end_col}))'
@@ -421,38 +456,31 @@ def process(idata, ofile):
 
         # Collect connections from ALL junctions within the node's extent (HM + HX)
         # Each HX junction can also have upward connections for additional outputs
-        all_conns = []
+        # Map column -> list of connections from that column
+        conns_by_col = {}
         for junction in corners:
             # Check if this junction is part of this node (same row, within node extent)
             if junction.row == node.row and node.col <= junction.col < node_end_col:
                 # Collect upward connections from this junction
                 for d in junction.conn:
                     if d.num <= junction.num:  # Same filter as colorTrace
-                        all_conns.append((junction.col, d))
-        all_conns.sort(key=lambda x: x[0])  # Sort by column only
+                        if junction.col not in conns_by_col:
+                            conns_by_col[junction.col] = []
+                        conns_by_col[junction.col].append((junction, d))
 
-        # Get sorted output labels
-        sorted_labels = sorted(output_labels.items())  # [(col, label), ...]
-
-        # Match labels with connections by index
-        # If more labels than connections, later labels won't get matched
-        for idx, (out_col, label) in enumerate(sorted_labels):
+        # Match labels with connections by column position
+        for out_col, label in output_labels.items():
             dest = None
             dest_col = None
 
-            if idx < len(all_conns):
-                conn_col, d = all_conns[idx]
-
-                # Find the junction at conn_col to use as starting point
-                start_junction = None
-                for j in corners:
-                    if j.row == node.row and j.col == conn_col:
-                        start_junction = j
-                        break
+            # Find connection originating from the same column as the label
+            if out_col in conns_by_col:
+                # Use the first connection from this column
+                # (typically there's only one upward connection per column)
+                start_junction, d = conns_by_col[out_col][0]
 
                 # Find destination for this connection
-                if start_junction:
-                    dest, dest_col = find_destination(start_junction, d)
+                dest, dest_col = find_destination(start_junction, d)
 
             # Only create edges to nodes (not X marks - those are for inputs)
             if dest and dest.code >= HM:  # HM or HX (node junctions, not XM)
@@ -525,16 +553,31 @@ def process(idata, ofile):
         for x in xlist:
             fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
 
-        # Draw edge labels in black
+        # Draw white halos for edge labels (background layer)
         if edges:
-            fout.write ('  color("Black") linear_extrude(height=1.1) {\n')
+            fout.write ('  color(label_halo_color) linear_extrude(height=1.09) {\n')
             for edge in edges:
-                edge.draw_labels(fout, maxy)
+                edge.draw_labels(fout, maxy, layer='halo')
+            fout.write ('  }\n')    # Close edge label halos color block
+
+        # Draw edge labels in black (foreground layer)
+        if edges:
+            fout.write ('  color(label_color) linear_extrude(height=1.1) {\n')
+            for edge in edges:
+                edge.draw_labels(fout, maxy, layer='label')
             fout.write ('  }\n')    # Close edge labels color block
 
         # Draw gray labels for unused outputs
         unused_outputs = [(row, col, label) for (row, col, label) in all_output_labels
                           if (row, col) not in used_outputs]
+        # Draw white halos for unused output labels (background layer)
+        if unused_outputs:
+            fout.write ('  color(label_halo_color) linear_extrude(height=1.19) {\n')
+            for row, col, label in unused_outputs:
+                # Draw at output position (above node)
+                fout.write (f'    drawCharHalo({col}, {maxy-row+1.3}, "{label}");\n')
+            fout.write ('  }\n')    # Close unused output label halos color block
+        # Draw unused output labels in grey (foreground layer)
         if unused_outputs:
             fout.write ('  color("Grey") linear_extrude(height=1.2) {\n')
             for row, col, label in unused_outputs:
