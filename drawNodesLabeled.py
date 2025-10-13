@@ -126,65 +126,89 @@ def colorFix(h):  # Put # at front of color-value hex-digits string
     try:  x = int(h,16); return '#'+h
     except: return h
 #==============================================================
-def calculate_camera_params(bbox, border=20, scale=10, target_imgsize=None):
-    """Calculate camera position and image size from bounding box
+def calculate_camera_params(bbox, border=0, scale=10, target_imgsize=None):
+    """Calculate camera position and image size from bounding box using orthographic projection formula
+
+    OpenSCAD orthographic projection formula:
+        visible_width = ($vpd / sqrt(1 + aspect^2)) * aspect
+        visible_height = $vpd / sqrt(1 + aspect^2)
+
+    Solving for $vpd:
+        $vpd = visible_width * sqrt(1 + aspect^2) / aspect
+        $vpd = visible_height * sqrt(1 + aspect^2)
 
     Args:
         bbox: (min_col, max_col, min_row, max_row, maxy)
-        border: Border padding as percentage (default 20%)
+        border: Border padding as percentage (default 0%)
         scale: OpenSCAD scale factor (default 10)
         target_imgsize: Optional (width, height) to fit drawing into with minimum border
     """
+    import math
+
     min_col, max_col, min_row, max_row, maxy = bbox
 
     # Calculate center point in OpenSCAD coordinates
-    center_x = (min_col + max_col) / 2 * scale
+    # Add +1 to center_x and dimensions to account for grid cell extent (elements occupy full cells)
+    # Note: center_y uses inverted coordinates (maxy - row) so +1 adjustment not needed
+    center_x = (min_col + max_col + 1) / 2 * scale
     center_y = (maxy - (min_row + max_row) / 2) * scale
 
     # Calculate drawing dimensions in OpenSCAD units
-    width = (max_col - min_col) * scale
-    height = (max_row - min_row) * scale
-
-    # Add border padding
-    padded_width = width * (1 + border / 100)
-    padded_height = height * (1 + border / 100)
+    # Add +1 to account for grid cell extent
+    width = (max_col - min_col + 1) * scale
+    height = (max_row - min_row + 1) * scale
 
     if target_imgsize:
-        # When imgsize is specified, calculate z_height to fit with minimum border
+        # When imgsize is specified, calculate $vpd to fit drawing with border
         img_width, img_height = target_imgsize
 
-        # Compare aspect ratios to determine limiting dimension
-        drawing_aspect = padded_width / padded_height if padded_height > 0 else 1
+        # Calculate image aspect ratio
         image_aspect = img_width / img_height if img_height > 0 else 1
 
-        if drawing_aspect > image_aspect:
-            # Drawing is relatively wider - width is limiting factor
-            z_height = padded_width
-        else:
-            # Drawing is relatively taller - height is limiting factor
-            z_height = padded_height * image_aspect
+        # Calculate desired visible dimensions (drawing + border)
+        border_fraction = border / 100
+        visible_width = width * (1 + border_fraction)
+        visible_height = height * (1 + border_fraction)
+
+        # Calculate diagonal scaling factor
+        diag_scale = math.sqrt(1 + image_aspect**2)
+
+        # Calculate $vpd needed for each dimension
+        vpd_for_width = visible_width * diag_scale / image_aspect
+        vpd_for_height = visible_height * diag_scale
+
+        # Use the larger $vpd to ensure both dimensions fit
+        z_height = max(vpd_for_width, vpd_for_height)
 
         return (center_x, center_y, z_height), target_imgsize
     else:
         # Auto-calculate imgsize with border percentage applied to each dimension
-
-        # Calculate border as percentage (applies to each dimension independently)
         border_fraction = border / 100
 
         # Add border to each dimension
-        padded_width = width * (1 + border_fraction)
-        padded_height = height * (1 + border_fraction)
+        visible_width = width * (1 + border_fraction)
+        visible_height = height * (1 + border_fraction)
 
         # Calculate imgsize at 10px per unit
-        img_width = int(padded_width * 10)
-        img_height = int(padded_height * 10)
+        img_width = int(visible_width * 10)
+        img_height = int(visible_height * 10)
 
         # Round to nearest 50 pixels
         img_width = ((img_width + 25) // 50) * 50
         img_height = ((img_height + 25) // 50) * 50
 
-        # z_height is the larger padded dimension to ensure everything fits
-        z_height = max(padded_width, padded_height)
+        # Calculate actual aspect ratio after rounding
+        image_aspect = img_width / img_height if img_height > 0 else 1
+
+        # Calculate diagonal scaling factor
+        diag_scale = math.sqrt(1 + image_aspect**2)
+
+        # Calculate $vpd needed for each dimension
+        vpd_for_width = visible_width * diag_scale / image_aspect
+        vpd_for_height = visible_height * diag_scale
+
+        # Use the larger $vpd to ensure both dimensions fit
+        z_height = max(vpd_for_width, vpd_for_height)
 
         return (center_x, center_y, z_height), (img_width, img_height)
 
@@ -202,6 +226,7 @@ def generate_png(ofile, imgsize, camera):
         '-o', f'{ofile}.png',
         '--imgsize', f'{w},{h}',
         '--camera', f'{x},{y},{z},{x},{y},0',
+        '--projection=ortho',
         '--autocenter',
         '--colorscheme', 'Cornfield',
         f'{ofile}.scad'
@@ -625,19 +650,105 @@ def process(idata, ofile):
         min_row = min(c.row for c in corners if c.code != 0)
         max_row = max(c.row for c in corners if c.code != 0)
 
-        # Add padding for overhanging elements (nodes, labels, circles)
-        min_col = min_col - 1  # Left padding for nodes/labels
-        max_col = max_col + 4  # Right padding (nodes extend right + labels)
-        min_row = min_row - 1  # Bottom padding (labels below nodes)
-        max_row = max_row + 2  # Top padding (labels above + complement circles)
+        # No fixed padding - use border parameter for padding control
+        # This ensures symmetric borders when border > 0
+        # Fixed padding was causing asymmetric borders due to center shift
     else:
         min_col = max_col = min_row = max_row = 0
 
     return (min_col, max_col, min_row, max_row, maxy)
 #======================================================================
+def print_help():
+    """Display help information about command-line options and usage"""
+    help_text = """
+drawNodesLabeled.py - ASCII Graph to OpenSCAD Converter
+========================================================
+
+Convert ASCII art graphs (drawn with _, /, \\, #, X, and spaces) into
+OpenSCAD files and optionally PNG images with transparent backgrounds.
+
+USAGE:
+    drawNodesLabeled.py [options] [filename]
+
+COMMAND-LINE OPTIONS:
+    file=FILENAME       Input file containing ASCII graphs
+                        (default: aTestSet)
+                        Note: Bare filename also works (e.g., 'myfile')
+
+    node=COLOR          Color for node bodies
+                        (default: 0000FF20 - pale blue with transparency)
+
+    loci=COLOR          Color for loci numbers (enables display)
+                        (default: '' - disabled)
+
+    text=COLOR          Color for text elements (enables display)
+                        (default: '' - disabled)
+
+    png=VALUE           Enable PNG generation (any non-empty value)
+                        (default: '' - disabled)
+
+COLOR FORMATS:
+    - Named colors:     Red, Green, Blue, Yellow, Black, etc.
+    - Hex RGB:          FF0000 (red), 00FF00 (green)
+    - Hex RGBA:         FF000080 (red with 50% transparency)
+    Note: Do NOT include '#' prefix - it will be added automatically
+
+IN-FILE DIRECTIVES:
+    Place these within diagram sections (between = markers):
+
+    @imgsize=WIDTH,HEIGHT    PNG output dimensions in pixels
+                             Example: @imgsize=800,600
+
+    @camera=X,Y,Z            Camera position override
+                             Example: @camera=150.0,75.0,250.0
+
+    @border=PERCENTAGE       Border size as percentage (0-100)
+                             (default: 0 - no border with transparent background)
+                             Example: @border=15
+
+EXAMPLES:
+    # Process file with default settings
+    drawNodesLabeled.py myfile.txt
+
+    # Generate PNG with custom node color
+    drawNodesLabeled.py node=00FF00 png=1 myfile.txt
+
+    # Show loci numbers in red, disable node fill
+    drawNodesLabeled.py loci=Red node= myfile.txt
+
+    # Multiple options
+    drawNodesLabeled.py file=graphs.txt node=FF0000AA loci=Blue png=1
+
+INPUT FILE FORMAT:
+    Files contain one or more diagrams, each enclosed in = markers:
+
+    =diagram_name
+    [ASCII art using _, /, \\, #, X characters]
+    [Optional: @imgsize=800,600]
+    [Optional: @border=15]
+    =
+
+    =another_diagram
+    [More ASCII art]
+    =
+
+OUTPUT:
+    - Always generates: diagram_name.scad (OpenSCAD file)
+    - With png option:  diagram_name.png (transparent background)
+
+For more information, see README.rst
+"""
+    print(help_text)
+#======================================================================
 # Set up default options to suppress loci numbers; suppress text;
 # paint node bodies in a pale blue; and by default read from t1-data.
 options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'aTestSet', 'png':''}
+
+# Check for help flag first
+if '--help' in argv or '-h' in argv:
+    print_help()
+    exit(0)
+
 arn, idata = 0, []
 while (arn := arn+1) < len(argv):
     if '=' in argv[arn]:
@@ -660,7 +771,7 @@ with open(options['file'], 'r') as fin:
                     # Generate PNG if requested
                     if options['png']:
                         # Use default border if not specified
-                        final_border = border if border is not None else 20
+                        final_border = border if border is not None else 0
 
                         # Calculate camera/imgsize from bounding box
                         # Pass imgsize if specified so z_height can be calculated to fit
