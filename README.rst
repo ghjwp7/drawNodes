@@ -26,9 +26,13 @@ The rest of this file has the following sections:
  • `Command-line Option Examples`_
  • `Input file formats`_
  • `X-marks and Trace Colors`_
+
+   - `Default Color Sequence`_
+   - `Custom Color Sequences`_
+
  • `Graph Parsing limitations`_
  • `How to make a .png output`_ with openscad results`_
- • `Automatic updates in OpenSCAD`_ 
+ • `Automatic updates in OpenSCAD`_
  • `Automatically running drawNodes upon changes to your input file`_
 
 Software requirements
@@ -133,8 +137,66 @@ X-marks and Trace Colors
 X-marks in graph lines are drawn using OpenSCAD's default brownish
 color.
 
-Trace colors are taken from a list of colors (``colist``, in function
-``aColor``) that you can change as you like.
+Trace colors are assigned in left-to-right order based on output
+positions on nodes. By default, colors are taken from ColorBrewer's
+**Paired** palette, a 12-color qualitative sequence designed for
+categorical data visualization. The palette features built-in
+light-dark pairing (e.g., light blue paired with medium blue), making
+it excellent for distinguishability without clashing.
+
+Default Color Sequence
+----------------------
+
+The default trace colors cycle through these 12 colors from
+ColorBrewer's Paired palette::
+
+    #A6CEE3  (light blue)      #1F78B4  (medium blue)
+    #B2DF8A  (light green)     #33A02C  (medium green)
+    #FB9A99  (light red)       #E31A1C  (medium red)
+    #FDBF6F  (light orange)    #FF7F00  (medium orange)
+    #CAB2D6  (light purple)    #6A3D9A  (medium purple)
+    #FFFF99  (light yellow)    #B15928  (brown)
+
+These colors provide balanced luminance for edge visibility and work
+well for graphs with many edges. If you have more than 12 outputs, the
+colors automatically cycle back to the beginning.
+
+Custom Color Sequences
+----------------------
+
+You can override the default colors for a specific diagram using the
+``@colors=`` directive in your input file. Place this directive between
+the opening ``=filename`` line and the closing ``=`` line::
+
+    =my_diagram
+    @colors=Red,Blue,Green,#FF00FF,Orange,Cyan
+    [ASCII diagram content]
+    =
+
+Colors are assigned sequentially from left to right based on output
+column positions. The ``@colors=`` directive accepts:
+
+ • Named colors (Red, Blue, Green, Yellow, Magenta, Cyan, Orange, etc.)
+ • Hex RGB values without # prefix (FF0000 for red, 00FF00 for green)
+ • Hex RGBA values with transparency (FF000080 for semi-transparent red)
+
+**Important:** Colors are assigned by output *position*, not by
+connection order. Unused outputs still consume their position in the
+color sequence, ensuring consistent color mapping across related
+diagrams.
+
+Example with custom colors::
+
+    =network_graph
+    @colors=1F78B4,E31A1C,33A02C,FF7F00
+         __________
+        /  _   ___ \
+        | / \ / X \|
+        ### | ### ||
+    =
+
+In this example, the leftmost output gets color #1F78B4 (blue), the
+second output gets #E31A1C (red), and so on from left to right.
 
 Graph Parsing Limitations
 =========================

@@ -220,7 +220,7 @@ class Path:
     def __repr__(self):
         return f'Path({self.label}, node={self.node_index}, start=({self.start_row},{self.start_col}), end=({self.end_row},{self.end_col}), segments={len(self.junctions)})'
 
-def process(idata, ofile):
+def process(idata, ofile, custom_colors=None):
     UR, LR, UL, LL, CL, VL = range(6) # Set Corner Codes + Vertical Line
     def upChar(dx):   # Return neighbor char from previous line
         if linn>0 and (0<= col+dx < len(idata[linn-1])):
@@ -470,7 +470,10 @@ def process(idata, ofile):
             paths.append(path)
 
     def aColor(n): # Return nth entry from list of colors
-        colist = ('Black','Red','Green','Yellow','Blue','Magenta','Cyan','White','Orange')
+        # Default colors: ColorBrewer's Paired palette (12 colors)
+        # Designed for categorical data with built-in light-dark pairing
+        colist = ('#A6CEE3','#1F78B4','#B2DF8A','#33A02C','#FB9A99','#E31A1C',
+                  '#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928')
         return colist[(n if n else 0)%len(colist)]
 
     def drawCorner(c):
@@ -506,10 +509,19 @@ def process(idata, ofile):
         fout.write (heading(ofile)) # Write drawing modules
 
         # Draw colored traces using Path objects
+        # Paths are already built in left-to-right order from sorted output labels
+        # So we can use the path index directly for color assignment
         if paths:
-            for path in paths:
-                colorNum = path.node_index + 1
-                colorName = aColor(colorNum)
+            for idx, path in enumerate(paths):
+                # Determine color for this path based on its index
+                if custom_colors:
+                    # Use custom color if available, cycling if necessary
+                    color_idx = idx % len(custom_colors)
+                    colorName = colorFix(custom_colors[color_idx])
+                else:
+                    # Fall back to auto-assigned colors using path index
+                    colorName = aColor(idx)
+
                 fout.write (f'  color(c="{colorName}") linear_extrude(height=1) ' + '{\n')
                 path.draw(fout, maxy, CL, VL)
                 # Close the current-trace color-block
@@ -583,13 +595,13 @@ with open(options['file'], 'r') as fin:
         # Read text for one diagram; send that text to process().
         if a[0]=='=':           # Detect opening =
             idata, ofile = [], a[1:].rstrip()
-            imgsize, camera, border = None, None, None  # Metadata for PNG generation
+            imgsize, camera, border, custom_colors = None, None, None, None  # Metadata for PNG generation
 
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
                 if a and a=='=':   # Detect closing =
                     # Process the SCAD file (file is fully written when this returns)
-                    bbox = process(idata, ofile)
+                    bbox = process(idata, ofile, custom_colors)
 
                     # Generate PNG if requested
                     if options['png']:
@@ -634,5 +646,16 @@ with open(options['file'], 'r') as fin:
                         border = float(a[8:])
                     except ValueError:
                         print(f"Warning: Invalid border format: {a}")
+                elif a.startswith('@colors='):
+                    # Parse @colors=Red,Blue,Green,#FF00FF,...
+                    try:
+                        color_string = a[8:].strip()
+                        if color_string:
+                            custom_colors = [c.strip() for c in color_string.split(',')]
+                        else:
+                            custom_colors = None
+                    except Exception as e:
+                        print(f"Warning: Invalid colors format: {a} - {e}")
+                        custom_colors = None
                 else:
                     idata.append(a)

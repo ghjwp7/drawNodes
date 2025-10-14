@@ -73,9 +73,9 @@ module drawComplement(x,y)
 module drawArrow(x, y) {
   // Draw upward-pointing triangle at position (x, y)
   // y is the bottom of the node, arrow points up into it
-  // Base is 1.5x wider than line width for visibility
+  // Base is 1.875x wider than line width, height is 1.25x line width (25% larger than original)
   translate(scale*[x, y, 0])
-    polygon([[0, 0], [-1.5*wFrac*scale, -wFrac*scale], [1.5*wFrac*scale, -wFrac*scale]]);
+    polygon([[0, 0], [-1.875*wFrac*scale, -1.25*wFrac*scale], [1.875*wFrac*scale, -1.25*wFrac*scale]]);
 }
 module drawXorSymbol(x, y, xfar) {
   // Draw circled plus (XOR symbol) in center of node
@@ -306,7 +306,7 @@ class Edge:
     def __repr__(self):
         return f'Edge({self.label}: ({self.start_row},{self.start_col}) -> ({self.end_row},{self.end_col}))'
 #==============================================================
-def process(idata, ofile):
+def process(idata, ofile, custom_colors=None):
     UR, LR, UL, LL, CL, XM, HM, HX = range(8) # Set Corner & Mark Codes
     def upChar(dx):   # Return neighbor char from previous line
         if linn>0 and (0<= col+dx < len(idata[linn-1])):
@@ -377,8 +377,10 @@ def process(idata, ofile):
         for c in corners[:25]: print(repr(c))
 
     def aColor(n): # Return nth entry from list of colors
-        # Colors like RGB ff00ff and RGBA 7F9F0080 also are ok to list
-        colist = ('Black','Red','Green','Yellow','Blue','Magenta','Cyan','White','Orange')
+        # Default colors: ColorBrewer's Paired palette (12 colors)
+        # Designed for categorical data with built-in light-dark pairing
+        colist = ('#A6CEE3','#1F78B4','#B2DF8A','#33A02C','#FB9A99','#E31A1C',
+                  '#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928')
         return colist[(n if n else 0)%len(colist)]
 
     def drawCorner(c):
@@ -574,9 +576,12 @@ def process(idata, ofile):
                     loci += 1
             fout.write ('  }\n')    # Close loci-numbering color block
 
-        # Draw X marks at input positions (always drawn, not dependent on loci option)
-        for x in xlist:
-            fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
+        # Draw X marks at input positions in grey (matches unused output color)
+        if xlist:
+            fout.write ('  color("Grey") linear_extrude(height=1.2) {\n')
+            for x in xlist:
+                fout.write (f'    drawChar({x.col}, {maxy-x.row}, "X");\n')
+            fout.write ('  }\n')    # Close X marks color block
 
         # Draw white halos for edge labels (background layer)
         if edges:
@@ -610,18 +615,40 @@ def process(idata, ofile):
                 fout.write (f'    drawChar({col}, {maxy-row+1.3}, "{label}");\n')
             fout.write ('  }\n')    # Close unused output labels color block
 
-        colorNum = 1                # Skip first two colors at outset
-        for b in nodes:   # Do traces from tops of nodes
+        # Use label-based approach for color assignment (more robust than node extent detection)
+        # Sort output labels by column position (left to right)
+        sorted_output_labels = sorted(all_output_labels, key=lambda x: x[1])
+
+        # Create position -> color index mapping from sorted labels
+        col_to_color_idx = {col: idx for idx, (row, col, label) in enumerate(sorted_output_labels)}
+
+        # Second pass: collect output traces (only connected outputs)
+        output_traces = []
+        for b in nodes:
             for d in b.conn:
-                # Only draw traces from tops of nodes
+                # Only collect traces from tops of nodes
                 if d.num > b.num: continue
-                # Start a current-trace color-block
-                colorNum += 1
-                colorName = aColor(colorNum)
-                fout.write (f'  color(c="{aColor(colorNum)}") linear_extrude(height=1) ' + '{\n')
-                colorTrace(b, d) # Draw the whole path
-                # Close the current-trace color-block
-                fout.write ('  }\n')
+                output_traces.append((b.col, b, d))
+
+        # Draw traces with colors based on positional index from sorted labels
+        for (col, b, d) in output_traces:
+            # Look up positional index for this column
+            pos_idx = col_to_color_idx.get(col, 0)
+
+            # Determine color for this output position
+            if custom_colors:
+                # Use custom color if available, cycling if necessary
+                color_idx = pos_idx % len(custom_colors)
+                colorName = colorFix(custom_colors[color_idx])
+            else:
+                # Fall back to auto-assigned colors (use positional index directly)
+                colorName = aColor(pos_idx)
+
+            # Start a current-trace color-block
+            fout.write (f'  color(c="{colorName}") linear_extrude(height=1) ' + '{\n')
+            colorTrace(b, d) # Draw the whole path
+            # Close the current-trace color-block
+            fout.write ('  }\n')
 
         # Draw complement circles on 2nd output of each node (drawn last so they appear on top)
         fout.write ('  color("Black") linear_extrude(height=1) {\n')
@@ -760,13 +787,13 @@ with open(options['file'], 'r') as fin:
         # Read text for one diagram; send that text to process().
         if a[0]=='=':           # Detect opening =
             idata, ofile = [], a[1:].rstrip()
-            imgsize, camera, border = None, None, None  # Metadata for PNG generation
+            imgsize, camera, border, custom_colors = None, None, None, None  # Metadata for PNG generation
 
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
                 if a and a=='=':   # Detect closing =
                     # Process the SCAD file (file is fully written when this returns)
-                    bbox = process(idata, ofile)
+                    bbox = process(idata, ofile, custom_colors)
 
                     # Generate PNG if requested
                     if options['png']:
@@ -815,5 +842,16 @@ with open(options['file'], 'r') as fin:
                         border = float(a[8:])
                     except ValueError:
                         print(f"Warning: Invalid border format: {a}")
+                elif a.startswith('@colors='):
+                    # Parse @colors=Red,Blue,Green,#FF00FF,...
+                    try:
+                        color_string = a[8:].strip()
+                        if color_string:
+                            custom_colors = [c.strip() for c in color_string.split(',')]
+                        else:
+                            custom_colors = None
+                    except Exception as e:
+                        print(f"Warning: Invalid colors format: {a} - {e}")
+                        custom_colors = None
                 else:
                     idata.append(a)

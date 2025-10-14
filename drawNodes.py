@@ -82,7 +82,7 @@ class Junction:
         return f' {self.num:2} {self.row:2} {self.col:2} {self.cc[self.code]}'
     def __repr__(self): return f'{str(self)} {[str(c) for c in self.conn]}'
 #==============================================================
-def process(idata, ofile):
+def process(idata, ofile, custom_colors=None):
     UR, LR, UL, LL, CL, XM, HM, HX = range(8) # Set Corner & Mark Codes
     def upChar(dx):   # Return neighbor char from previous line
         if linn>0 and (0<= col+dx < len(idata[linn-1])):
@@ -141,8 +141,10 @@ def process(idata, ofile):
         for c in corners[:25]: print(repr(c))
 
     def aColor(n): # Return nth entry from list of colors
-        # Colors like RGB ff00ff and RGBA 7F9F0080 also are ok to list
-        colist = ('Black','Red','Green','Yellow','Blue','Magenta','Cyan','White','Orange')
+        # Default colors: ColorBrewer's Paired palette (12 colors)
+        # Designed for categorical data with built-in light-dark pairing
+        colist = ('#A6CEE3','#1F78B4','#B2DF8A','#33A02C','#FB9A99','#E31A1C',
+                  '#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928')
         return colist[(n if n else 0)%len(colist)]
 
     def drawCorner(c):
@@ -204,21 +206,58 @@ def process(idata, ofile):
                     loci += 1
             fout.write ('  }\n')    # Close loci-numbering color block
 
+        # Draw X marks at input positions in grey (matches unused output color)
+        if xlist:
+            fout.write ('  color("Grey") linear_extrude(height=1.2) {\n')
             for x in xlist:
-                fout.write (f'  linear_extrude(height=1.2) drawChar({x.col}, {maxy-x.row}, "X");\n')
+                fout.write (f'    drawChar({x.col}, {maxy-x.row}, "X");\n')
+            fout.write ('  }\n')    # Close X marks color block
 
-        colorNum = 1                # Skip first two colors at outset
-        for b in nodes:   # Do traces from tops of nodes                
+        # First pass: collect ALL output column positions from all nodes
+        all_output_columns = []
+        for b in nodes:
+            if b.code == HM:
+                # Find the extent of this node (HM + consecutive HX)
+                xfar = 1
+                while corners[b.num+xfar].col==b.col+xfar and corners[b.num+xfar].code==HX:
+                    xfar += 1
+                # Add only actual output columns (first and last of node extent)
+                all_output_columns.append(b.col)  # First output
+                if xfar > 1:
+                    all_output_columns.append(b.col + xfar - 1)  # Second output (rightmost)
+
+        # Sort columns and create position -> color index mapping
+        all_output_columns.sort()
+        col_to_color_idx = {col: idx for idx, col in enumerate(all_output_columns)}
+
+        # Second pass: collect output traces (only connected outputs)
+        output_traces = []
+        for b in nodes:
             for d in b.conn:
-                # Only draw traces from tops of nodes
+                # Only collect traces from tops of nodes
                 if d.num > b.num: continue
-                # Start a current-trace color-block
-                colorNum += 1
-                colorName = aColor(colorNum)
-                fout.write (f'  color(c="{aColor(colorNum)}") linear_extrude(height=1) ' + '{\n')
-                colorTrace(b, d) # Draw the whole path
-                # Close the current-trace color-block
-                fout.write ('  }\n')
+                output_traces.append((b.col, b, d))
+
+        # Draw traces with colors based on positional index
+        colorNum = 1                # Skip first two colors at outset
+        for (col, b, d) in output_traces:
+            # Look up positional index for this column
+            pos_idx = col_to_color_idx.get(col, 0)
+
+            # Determine color for this output position
+            if custom_colors:
+                # Use custom color if available, cycling if necessary
+                color_idx = pos_idx % len(custom_colors)
+                colorName = colorFix(custom_colors[color_idx])
+            else:
+                # Fall back to auto-assigned colors (use positional index)
+                colorName = aColor(pos_idx + 2)  # +2 to skip first two colors
+
+            # Start a current-trace color-block
+            fout.write (f'  color(c="{colorName}") linear_extrude(height=1) ' + '{\n')
+            colorTrace(b, d) # Draw the whole path
+            # Close the current-trace color-block
+            fout.write ('  }\n')
 
         # Close drawStuff module and invoke it
         fout.write ('}\ndrawStuff();\n')
@@ -237,9 +276,22 @@ with open(options['file'], 'r') as fin:
         # Read text for one diagram; send that text to process().
         if a[0]=='=':           # Detect opening =
             idata, ofile = [], a[1:].rstrip()
+            custom_colors = None
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
                 if a and a=='=':   # Detect closing =
-                    process(idata, ofile)
+                    process(idata, ofile, custom_colors)
                     break
-                idata.append(a)
+                elif a.startswith('@colors='):
+                    # Parse @colors=Red,Blue,Green,#FF00FF,...
+                    try:
+                        color_string = a[8:].strip()
+                        if color_string:
+                            custom_colors = [c.strip() for c in color_string.split(',')]
+                        else:
+                            custom_colors = None
+                    except Exception as e:
+                        print(f"Warning: Invalid colors format: {a} - {e}")
+                        custom_colors = None
+                else:
+                    idata.append(a)
