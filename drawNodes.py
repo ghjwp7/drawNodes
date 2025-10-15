@@ -250,8 +250,8 @@ def process(idata, ofile, custom_colors=None):
                 color_idx = pos_idx % len(custom_colors)
                 colorName = colorFix(custom_colors[color_idx])
             else:
-                # Fall back to auto-assigned colors (use positional index)
-                colorName = aColor(pos_idx + 2)  # +2 to skip first two colors
+                # Fall back to auto-assigned colors (use positional index directly)
+                colorName = aColor(pos_idx)
 
             # Start a current-trace color-block
             fout.write (f'  color(c="{colorName}") linear_extrude(height=1) ' + '{\n')
