@@ -386,7 +386,10 @@ def process(idata, ofile, custom_colors=None):
         corners.append(Junction(0, 0, 0, 0))  # Need extra node for testing
 
     def hhfind(cor):
-        for c in corners[1 + cor.num :]:
+        # Search ALL corners on the same row, not just ones that come after
+        for c in corners:
+            if c.num == 0 or c.num == cor.num:  # Skip dummy corner and self
+                continue
             # Any corner type on the same row can be a horizontal connection
             if c.row == cor.row and c.code < CL:
                 # Check if there's a valid horizontal connection
@@ -398,8 +401,8 @@ def process(idata, ofile, custom_colors=None):
                     has_underscore = "_" in between
                     has_corner = any(ch in "/\\" for ch in between)
                     is_short = (
-                        distance <= 10
-                    )  # Short connections don't need underscores
+                        distance <= 15
+                    )  # Short connections don't need underscores (increased from 10 to 15)
 
                     if has_underscore or (is_short and not has_corner):
                         return corners[c.num]
@@ -475,7 +478,7 @@ def process(idata, ofile, custom_colors=None):
 
             # Phase 1: Trace UPWARD from start_junction to find top corner (UL or UR)
             def trace_up(c):
-                """Trace upward by scanning for next junction above, return top corner"""
+                """Trace upward by scanning for next junction above, return top corner with valid horizontal connections"""
                 # Find next junction in same column with row < c.row
                 next_junctions = [
                     j for j in corners if j.col == c.col and j.row < c.row and j.num > 0
@@ -494,11 +497,17 @@ def process(idata, ofile, custom_colors=None):
                     visited.add(canon)
                     segments.append((c, d))
 
-                    # Check if we've reached a top corner
-                    # LR/LL = path goes up then turns horizontal
-                    # UL/UR = path goes horizontal then turns up
+                    # Check if we've reached a corner
                     if d.code in (UL, UR, LR, LL):
-                        return d
+                        # Check if this corner has horizontal connections
+                        horiz_conns = [
+                            conn for conn in d.conn if conn.row == d.row and conn.col != d.col
+                        ]
+                        if horiz_conns:
+                            return d
+                        else:
+                            # This corner can't connect horizontally, keep going up
+                            return trace_up(d)
                     # Continue up through VL junctions
                     elif d.code == VL:
                         return trace_up(d)
@@ -686,19 +695,45 @@ def process(idata, ofile, custom_colors=None):
                             fout.write("  }\n")
 
         # Draw text characters in black
-        if text_chars:
+        # Sort by row, then by column
+        text_chars.sort(key=lambda x: (x[0], x[1]))
+
+        # Combine negation characters (-, ~) with adjacent characters
+        combined_chars = []
+        skip_next = set()  # Track indices to skip
+
+        for i in range(len(text_chars)):
+            if i in skip_next:
+                continue
+
+            row, col, char = text_chars[i]
+
+            # Check if this is a negation character and there's a next character
+            if char in '-~' and i + 1 < len(text_chars):
+                next_row, next_col, next_char = text_chars[i + 1]
+                # Check if next character is adjacent (same row, next column)
+                if next_row == row and next_col == col + 1:
+                    # Combine them
+                    combined_chars.append((row, col, char + next_char))
+                    skip_next.add(i + 1)
+                    continue
+
+            # Not a negation pattern, add as is
+            combined_chars.append((row, col, char))
+
+        if combined_chars:
             fout.write('  color("Black") linear_extrude(height=1.2) {\n')
-            for row, col, char in text_chars:
+            for row, col, text in combined_chars:
                 # Escape special characters for OpenSCAD
-                escaped_char = char.replace("\\", "\\\\").replace('"', '\\"')
-                fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_char}");\n')
+                escaped_text = text.replace("\\", "\\\\").replace('"', '\\"')
+                fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
             fout.write("  }\n")
 
         # Close drawStuff module and invoke it
         fout.write("}\ndrawStuff();\n")
 
-    # Calculate bounding box from all corners (and text positions)
-    if corners or text_chars:
+    # Calculate bounding box from all corners and combined text (accounting for multi-char strings)
+    if corners or combined_chars:
         min_col = min_row = float("inf")
         max_col = max_row = float("-inf")
 
@@ -709,17 +744,17 @@ def process(idata, ofile, custom_colors=None):
                 min_row = min(min_row, c.row)
                 max_row = max(max_row, c.row)
 
-        for row, col, char in text_chars:
+        for row, col, text in combined_chars:
             min_col = min(min_col, col)
-            max_col = max(max_col, col)
+            # For multi-character strings, extend max_col to account for text width
+            # Each character takes approximately 1 column worth of space
+            max_col = max(max_col, col + len(text) - 1)
             min_row = min(min_row, row)
             max_row = max(max_row, row)
 
-        # Add small padding for text
-        min_col = min_col - 1
-        max_col = max_col + 2
-        min_row = min_row - 1
-        max_row = max_row + 1
+        # No fixed padding - use border parameter for padding control
+        # This ensures symmetric borders when border > 0
+        # Fixed padding was causing asymmetric borders due to center shift
     else:
         min_col = max_col = min_row = max_row = 0
 
@@ -803,13 +838,12 @@ with open(options["file"], "r") as fin:
 
                     # Generate PNG if requested
                     if options["png"]:
-                        # Use default border if not specified
-                        final_border = border if border is not None else 0
+                        # Use default border if not specified (10% provides adequate padding)
+                        final_border = border if border is not None else 10
 
-                        # Calculate camera/imgsize from bounding box (always with 0 border for tight fit)
-                        # Border is applied later via ImageMagick trim+border
+                        # Calculate camera/imgsize from bounding box with border for proper viewport
                         calc_camera, calc_imgsize = calculate_camera_params(
-                            bbox, border=0, target_imgsize=imgsize
+                            bbox, border=final_border, target_imgsize=imgsize
                         )
 
                         # Use explicit camera if provided, otherwise use calculated
@@ -828,7 +862,8 @@ with open(options["file"], "r") as fin:
                                 f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}"
                             )
 
-                        generate_png(ofile, final_imgsize, final_camera, final_border)
+                        # Pass 0 for ImageMagick border since border is already in viewport
+                        generate_png(ofile, final_imgsize, final_camera, 0)
                     break
                 elif a.startswith("@imgsize="):
                     parts = a[9:].split(",")
