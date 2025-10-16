@@ -212,8 +212,12 @@ def calculate_camera_params(bbox, border=0, scale=10, target_imgsize=None):
 
         return (center_x, center_y, z_height), (img_width, img_height)
 
-def generate_png(ofile, imgsize, camera):
-    """Generate PNG from SCAD file using OpenSCAD CLI"""
+def generate_png(ofile, imgsize, camera, border=0):
+    """Generate PNG from SCAD file using OpenSCAD CLI
+
+    Args:
+        border: Border size in pixels (default 0). Applied via ImageMagick after trimming.
+    """
     if not imgsize or not camera:
         print(f"Warning: Missing metadata for {ofile}, skipping PNG generation")
         return
@@ -238,7 +242,7 @@ def generate_png(ofile, imgsize, camera):
         if result.returncode == 0:
             print(f"Successfully generated {ofile}.png")
 
-            # Make background transparent using ImageMagick
+            # Make background transparent, trim excess, and add border using ImageMagick
             # Cornfield colorscheme uses RGB(255,255,229) as background
             # Use -fuzz to handle anti-aliasing at edges
             convert_cmd = [
@@ -246,15 +250,22 @@ def generate_png(ofile, imgsize, camera):
                 f'{ofile}.png',
                 '-fuzz', '5%',
                 '-transparent', 'rgb(255,255,229)',
-                f'{ofile}.png'
+                '-trim',  # Always trim to remove excess transparent border
             ]
+            # Add border if requested
+            if border > 0:
+                convert_cmd.extend(['-bordercolor', 'none', '-border', str(int(border))])
+            convert_cmd.append(f'{ofile}.png')
 
-            print(f"Making background transparent...")
+            print(f"Making background transparent and trimming...")
             convert_result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=30)
             if convert_result.returncode == 0:
-                print(f"Successfully created transparent background for {ofile}.png")
+                if border > 0:
+                    print(f"Successfully created transparent background with {int(border)}px border")
+                else:
+                    print(f"Successfully created transparent background (trimmed)")
             else:
-                print(f"Warning: Could not make background transparent: {convert_result.stderr}")
+                print(f"Warning: Could not process image: {convert_result.stderr}")
         else:
             print(f"Error generating {ofile}.png: {result.stderr}")
     except FileNotFoundError:
@@ -729,9 +740,9 @@ IN-FILE DIRECTIVES:
     @camera=X,Y,Z            Camera position override
                              Example: @camera=150.0,75.0,250.0
 
-    @border=PERCENTAGE       Border size as percentage (0-100)
-                             (default: 0 - no border with transparent background)
-                             Example: @border=15
+    @border=PIXELS           Border size in pixels
+                             (default: 0 - trimmed with no border)
+                             Example: @border=10
 
 EXAMPLES:
     # Process file with default settings
@@ -752,7 +763,7 @@ INPUT FILE FORMAT:
     =diagram_name
     [ASCII art using _, /, \\, #, X characters]
     [Optional: @imgsize=800,600]
-    [Optional: @border=15]
+    [Optional: @border=10]
     =
 
     =another_diagram
@@ -782,12 +793,59 @@ while (arn := arn+1) < len(argv):
         opt, val = argv[arn].split('=')
         options[opt] = val
     else: options['file'] = argv[arn] # Default case = file name
+
+# Parse global options (before first diagram)
+global_options = {}
 with open(options['file'], 'r') as fin:
+    # First pass: read global options (lines before first =)
+    while True:
+        pos = fin.tell()  # Save position before reading
+        a = fin.readline()
+        if not a:  # EOF
+            break
+        if a[0] == '=':
+            # Found first diagram, go back to this line
+            fin.seek(pos)
+            break
+        # Parse global options
+        a = a.rstrip()
+        if a.startswith('@imgsize='):
+            parts = a[9:].split(',')
+            if len(parts) == 2:
+                try:
+                    global_options['imgsize'] = (int(parts[0]), int(parts[1]))
+                except ValueError:
+                    print(f"Warning: Invalid global imgsize format: {a}")
+        elif a.startswith('@camera='):
+            parts = a[8:].split(',')
+            if len(parts) == 3:
+                try:
+                    global_options['camera'] = (float(parts[0]), float(parts[1]), float(parts[2]))
+                except ValueError:
+                    print(f"Warning: Invalid global camera format: {a}")
+        elif a.startswith('@border='):
+            try:
+                global_options['border'] = float(a[8:])
+            except ValueError:
+                print(f"Warning: Invalid global border format: {a}")
+        elif a.startswith('@colors='):
+            try:
+                color_string = a[8:].strip()
+                if color_string:
+                    global_options['colors'] = [c.strip() for c in color_string.split(',')]
+            except Exception as e:
+                print(f"Warning: Invalid global colors format: {a} - {e}")
+
+    # Second pass: process diagrams
     while a := fin.readline():
         # Read text for one diagram; send that text to process().
         if a[0]=='=':           # Detect opening =
             idata, ofile = [], a[1:].rstrip()
-            imgsize, camera, border, custom_colors = None, None, None, None  # Metadata for PNG generation
+            # Initialize with global defaults
+            imgsize = global_options.get('imgsize', None)
+            camera = global_options.get('camera', None)
+            border = global_options.get('border', None)
+            custom_colors = global_options.get('colors', None)
 
             while a := fin.readline():   # Allow blank lines
                 a = a.rstrip()  # Drop ending whitespace
@@ -800,10 +858,11 @@ with open(options['file'], 'r') as fin:
                         # Use default border if not specified
                         final_border = border if border is not None else 0
 
-                        # Calculate camera/imgsize from bounding box
+                        # Calculate camera/imgsize from bounding box (always with 0 border for tight fit)
+                        # Border is applied later via ImageMagick trim+border
                         # Pass imgsize if specified so z_height can be calculated to fit
                         calc_camera, calc_imgsize = calculate_camera_params(
-                            bbox, border=final_border, target_imgsize=imgsize
+                            bbox, border=0, target_imgsize=imgsize
                         )
 
                         # Use explicit camera if provided, otherwise use calculated
@@ -818,7 +877,7 @@ with open(options['file'], 'r') as fin:
                         if not imgsize:
                             print(f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}")
 
-                        generate_png(ofile, final_imgsize, final_camera)
+                        generate_png(ofile, final_imgsize, final_camera, final_border)
                     break
                 elif a.startswith('@imgsize='):
                     # Parse @imgsize=800,250
