@@ -164,6 +164,7 @@ def generate_png(ofile, imgsize, camera, border=0):
         f"{w},{h}",
         "--camera",
         f"{x},{y},{z},{x},{y},0",
+        "--projection=ortho",
         "--autocenter",
         "--colorscheme",
         "Cornfield",
@@ -186,7 +187,7 @@ def generate_png(ofile, imgsize, camera, border=0):
                 "5%",
                 "-transparent",
                 "rgb(255,255,229)",
-                "-trim",  # Always trim to remove excess transparent border
+                "-trim",  # Trim excess transparent border
             ]
             # Add border if requested
             if border > 0:
@@ -752,9 +753,15 @@ def process(idata, ofile, custom_colors=None):
             min_row = min(min_row, row)
             max_row = max(max_row, row)
 
-        # No fixed padding - use border parameter for padding control
-        # This ensures symmetric borders when border > 0
-        # Fixed padding was causing asymmetric borders due to center shift
+        # Add padding to account for text glyphs extending beyond anchor points
+        # OpenSCAD text rendering places anchor at the specified position, but
+        # the actual glyph pixels extend significantly left/right/above/below
+        # Need very generous padding to ensure all glyph pixels are within viewport
+        padding = 8.0  # 8.0 column widths provides ample margin for glyph overhang
+        min_col = min_col - padding
+        max_col = max_col + padding
+        min_row = min_row - padding
+        max_row = max_row + padding
     else:
         min_col = max_col = min_row = max_row = 0
 
@@ -838,12 +845,13 @@ with open(options["file"], "r") as fin:
 
                     # Generate PNG if requested
                     if options["png"]:
-                        # Use default border if not specified (10% provides adequate padding)
+                        # Use default border if not specified (10 pixels provides clean margin)
                         final_border = border if border is not None else 10
 
-                        # Calculate camera/imgsize from bounding box with border for proper viewport
+                        # Calculate camera/imgsize from bounding box (always with border=0 for tight fit)
+                        # Border is applied later via ImageMagick trim+border
                         calc_camera, calc_imgsize = calculate_camera_params(
-                            bbox, border=final_border, target_imgsize=imgsize
+                            bbox, border=0, target_imgsize=imgsize
                         )
 
                         # Use explicit camera if provided, otherwise use calculated
@@ -862,8 +870,8 @@ with open(options["file"], "r") as fin:
                                 f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}"
                             )
 
-                        # Pass 0 for ImageMagick border since border is already in viewport
-                        generate_png(ofile, final_imgsize, final_camera, 0)
+                        # Pass final_border to ImageMagick for pixel-based border after trimming
+                        generate_png(ofile, final_imgsize, final_camera, final_border)
                     break
                 elif a.startswith("@imgsize="):
                     parts = a[9:].split(",")
