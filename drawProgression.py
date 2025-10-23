@@ -40,6 +40,8 @@ module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
 module drawCharBold(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+module drawCharBoldItalic(x,y,t)
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 module drawCharHalo(x,y,t) {
   // Regular font halo with 4-directional shifts for complete outline
   translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
@@ -53,6 +55,13 @@ module drawCharHaloBold(x,y,t) {
   translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
+}
+module drawCharHaloBoldItalic(x,y,t) {
+  // Bold italic font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
@@ -626,6 +635,8 @@ def process(idata, ofile, custom_colors=None):
 
     # Build sets of output and input columns from traced paths
     output_cols = set()
+    out1_cols = set()  # Columns for first output (even indices)
+    out2_cols = set()  # Columns for second output (odd indices)
     input_cols = set()
     col_to_output_index = {}  # Map column → path index (for out1/out2 distinction)
 
@@ -633,6 +644,11 @@ def process(idata, ofile, custom_colors=None):
         if path.start_col is not None:
             output_cols.add(path.start_col)
             col_to_output_index[path.start_col] = idx
+            # Even indices are out1, odd indices are out2
+            if idx % 2 == 0:
+                out1_cols.add(path.start_col)
+            else:
+                out2_cols.add(path.start_col)
         if path.end_col is not None:
             input_cols.add(path.end_col)
 
@@ -757,12 +773,29 @@ def process(idata, ofile, custom_colors=None):
             combined_chars.append((row, col, char))
 
         # Find rows that contain "=" (truth table rows)
+        # Track both the "=" position and which columns are out1 vs out2
         rows_with_equals = {}  # row → column position of "="
+        truth_table_out1_cols = set()  # Columns for out1 in truth table
+        truth_table_out2_cols = set()  # Columns for out2 in truth table
+
         for row, col, text in combined_chars:
             if "=" in text:
                 # Find position of "=" within the text
                 eq_pos = text.index("=")
                 rows_with_equals[row] = col + eq_pos
+
+        # For each truth table row, identify which columns after "=" are out1 vs out2
+        for row in rows_with_equals:
+            eq_col = rows_with_equals[row]
+            # Find all characters after "=" in this row
+            chars_after_eq = [(c, t) for r, c, t in combined_chars if r == row and c > eq_col]
+            # Sort by column position
+            chars_after_eq.sort(key=lambda x: x[0])
+            # First character is out1, second is out2
+            if len(chars_after_eq) >= 1:
+                truth_table_out1_cols.add(chars_after_eq[0][0])
+            if len(chars_after_eq) >= 2:
+                truth_table_out2_cols.add(chars_after_eq[1][0])
 
         if combined_chars:
             fout.write('  color("Black") linear_extrude(height=1.2) {\n')
@@ -770,19 +803,28 @@ def process(idata, ofile, custom_colors=None):
                 # Escape special characters for OpenSCAD
                 escaped_text = text.replace("\\", "\\\\").replace('"', '\\"')
 
-                # Determine if this character should be bold (is an output)
-                is_output = False
+                # Determine which type of character this is
+                is_out1 = False
+                is_out2 = False
 
-                # Check if in an output column
-                if col in output_cols:
-                    is_output = True
-                # Check if after "=" sign (truth table outputs)
-                elif row in rows_with_equals and col > rows_with_equals[row]:
-                    is_output = True
+                # Check if in an out1 column
+                if col in out1_cols:
+                    is_out1 = True
+                # Check if in an out2 column
+                elif col in out2_cols:
+                    is_out2 = True
+                # Check if in truth table out1 position
+                elif col in truth_table_out1_cols:
+                    is_out1 = True
+                # Check if in truth table out2 position
+                elif col in truth_table_out2_cols:
+                    is_out2 = True
 
                 # Use appropriate drawing function
-                if is_output:
+                if is_out1:
                     fout.write(f'    drawCharBold({col}, {maxy - row}, "{escaped_text}");\n')
+                elif is_out2:
+                    fout.write(f'    drawCharBoldItalic({col}, {maxy - row}, "{escaped_text}");\n')
                 else:
                     fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
             fout.write("  }\n")

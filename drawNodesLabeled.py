@@ -105,6 +105,8 @@ module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
 module drawCharBold(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+module drawCharBoldItalic(x,y,t)
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 module drawCharHalo(x,y,t) {
   // Regular font halo with 4-directional shifts for complete outline
   translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
@@ -118,6 +120,13 @@ module drawCharHaloBold(x,y,t) {
   translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
+}
+module drawCharHaloBoldItalic(x,y,t) {
+  // Bold italic font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
@@ -303,7 +312,7 @@ class Junction:
     def __repr__(self): return f'{str(self)} {[str(c) for c in self.conn]}'
 #==============================================================
 class Edge:
-    def __init__(self, label, start_row, start_col, end_row, end_col, source_node, dest_node):
+    def __init__(self, label, start_row, start_col, end_row, end_col, source_node, dest_node, is_out2=False):
         self.label = label
         self.start_row = start_row
         self.start_col = start_col
@@ -311,6 +320,7 @@ class Edge:
         self.end_col = end_col
         self.source_node = source_node
         self.dest_node = dest_node
+        self.is_out2 = is_out2  # True if this is the second output (out2), False for out1
 
     def draw_labels(self, fout, maxy, layer='label'):
         """Draw label at both ends of the edge
@@ -319,15 +329,15 @@ class Edge:
             layer: 'halo' for white background layer, 'label' for actual label
         """
         # Use matching font style for halos and labels
-        # Bold for outputs, regular for inputs
+        # Bold for out1, bold italic for out2, regular for inputs
         if layer == 'halo':
-            draw_func_output = 'drawCharHaloBold'
+            draw_func_output = 'drawCharHaloBoldItalic' if self.is_out2 else 'drawCharHaloBold'
             draw_func_input = 'drawCharHalo'
         else:
-            draw_func_output = 'drawCharBold'
+            draw_func_output = 'drawCharBoldItalic' if self.is_out2 else 'drawCharBold'
             draw_func_input = 'drawChar'
 
-        # Draw at output (just above source node at row+1.3) - BOLD
+        # Draw at output (just above source node at row+1.3) - BOLD or BOLD ITALIC
         fout.write(f'    {draw_func_output}({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
         # Draw at input (at input row position, same level as X marks) - REGULAR
         fout.write(f'    {draw_func_input}({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
@@ -546,7 +556,10 @@ def process(idata, ofile, custom_colors=None):
                 end_row = dest.row + 1    # Just below destination
                 end_col = dest_col
 
-                edge = Edge(label, start_row, start_col, end_row, end_col, node, dest)
+                # Determine if this is out2 (rightmost column of node)
+                is_out2 = (out_col == node.col + xfar - 1)
+
+                edge = Edge(label, start_row, start_col, end_row, end_col, node, dest, is_out2)
                 edges.append(edge)
 
                 # Mark this output as used
@@ -629,19 +642,35 @@ def process(idata, ofile, custom_colors=None):
         # Draw gray labels for unused outputs
         unused_outputs = [(row, col, label) for (row, col, label) in all_output_labels
                           if (row, col) not in used_outputs]
+
+        # Build a map to determine which outputs are out2 (rightmost column of each node)
+        node_rightmost_cols = {}  # node.row -> rightmost column
+        for node in nodes:
+            if node.code == HM:
+                xfar = 1
+                while node.num+xfar < len(corners) and corners[node.num+xfar].col==node.col+xfar and corners[node.num+xfar].code==HX:
+                    xfar += 1
+                node_rightmost_cols[node.row] = node.col + xfar - 1
+
         # Draw white halos for unused output labels (background layer)
         if unused_outputs:
             fout.write ('  color(label_halo_color) linear_extrude(height=1.19) {\n')
             for row, col, label in unused_outputs:
+                # Determine if this is out2 (rightmost column)
+                is_out2 = (col == node_rightmost_cols.get(row + 1))  # row+1 because label_row is above node
+                halo_func = 'drawCharHaloBoldItalic' if is_out2 else 'drawCharHaloBold'
                 # Draw at output position (above node)
-                fout.write (f'    drawCharHaloBold({col}, {maxy-row+1.3}, "{label}");\n')
+                fout.write (f'    {halo_func}({col}, {maxy-row+1.3}, "{label}");\n')
             fout.write ('  }\n')    # Close unused output label halos color block
-        # Draw unused output labels in grey (foreground layer) - BOLD
+        # Draw unused output labels in grey (foreground layer) - BOLD or BOLD ITALIC
         if unused_outputs:
             fout.write ('  color("Grey") linear_extrude(height=1.2) {\n')
             for row, col, label in unused_outputs:
+                # Determine if this is out2 (rightmost column)
+                is_out2 = (col == node_rightmost_cols.get(row + 1))  # row+1 because label_row is above node
+                draw_func = 'drawCharBoldItalic' if is_out2 else 'drawCharBold'
                 # Draw at output position (above node)
-                fout.write (f'    drawCharBold({col}, {maxy-row+1.3}, "{label}");\n')
+                fout.write (f'    {draw_func}({col}, {maxy-row+1.3}, "{label}");\n')
             fout.write ('  }\n')    # Close unused output labels color block
 
         # Use label-based approach for color assignment (more robust than node extent detection)
