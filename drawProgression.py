@@ -16,6 +16,12 @@ def heading(ofile):
     return (
         f"// File {ofile}, generated {dt} by drawProgression"
         + """
+/* [Label Colors] */
+// Color for edge labels
+label_color = "Black";
+// Color for label halo/outline (using over-bright RGB to compensate for lighting)
+label_halo_color = [1.5,1.5,1.5];
+
 // Number of sides for round things
 $fn=31;
 // Width as fraction of scale
@@ -32,6 +38,22 @@ module drawH(bx, by, ll)
   translate (scale*[bx,by+wf,0])   square([scale*ll,wFrac*scale]);
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
+module drawCharBold(x,y,t)
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+module drawCharHalo(x,y,t) {
+  // Regular font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale);
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale);
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale);
+}
+module drawCharHaloBold(x,y,t) {
+  // Bold font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
+}
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
     intersection() {
@@ -727,7 +749,11 @@ def process(idata, ofile, custom_colors=None):
             for row, col, text in combined_chars:
                 # Escape special characters for OpenSCAD
                 escaped_text = text.replace("\\", "\\\\").replace('"', '\\"')
-                fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
+                # Use bold for output labels (first label row), regular for input labels
+                if output_row is not None and row == output_row:
+                    fout.write(f'    drawCharBold({col}, {maxy - row}, "{escaped_text}");\n')
+                else:
+                    fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
             fout.write("  }\n")
 
         # Close drawStuff module and invoke it

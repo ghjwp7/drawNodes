@@ -28,8 +28,8 @@ def heading(ofile):
 /* [Label Colors] */
 // Color for edge labels
 label_color = "Black";
-// Color for label halo/outline
-label_halo_color = "White";
+// Color for label halo/outline (using over-bright RGB to compensate for lighting)
+label_halo_color = [1.5,1.5,1.5];
 
 // Number of sides for round things
 $fn=31;
@@ -103,9 +103,21 @@ module drawXorSymbol(x, y, xfar) {
 }
 module drawChar(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale);
-module drawCharHalo(x,y,t) {
+module drawCharBold(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+module drawCharHalo(x,y,t) {
+  // Regular font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale);
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale);
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale);
+}
+module drawCharHaloBold(x,y,t) {
+  // Bold font halo with 4-directional shifts for complete outline
   translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold");
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
@@ -306,13 +318,19 @@ class Edge:
         Args:
             layer: 'halo' for white background layer, 'label' for actual label
         """
-        # Use larger text for halo, normal text for label
-        draw_func = 'drawCharHalo' if layer == 'halo' else 'drawChar'
+        # Use matching font style for halos and labels
+        # Bold for outputs, regular for inputs
+        if layer == 'halo':
+            draw_func_output = 'drawCharHaloBold'
+            draw_func_input = 'drawCharHalo'
+        else:
+            draw_func_output = 'drawCharBold'
+            draw_func_input = 'drawChar'
 
-        # Draw at output (just above source node at row+1.3)
-        fout.write(f'    {draw_func}({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
-        # Draw at input (at input row position, same level as X marks)
-        fout.write(f'    {draw_func}({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
+        # Draw at output (just above source node at row+1.3) - BOLD
+        fout.write(f'    {draw_func_output}({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
+        # Draw at input (at input row position, same level as X marks) - REGULAR
+        fout.write(f'    {draw_func_input}({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
 
     def __repr__(self):
         return f'Edge({self.label}: ({self.start_row},{self.start_col}) -> ({self.end_row},{self.end_col}))'
@@ -616,14 +634,14 @@ def process(idata, ofile, custom_colors=None):
             fout.write ('  color(label_halo_color) linear_extrude(height=1.19) {\n')
             for row, col, label in unused_outputs:
                 # Draw at output position (above node)
-                fout.write (f'    drawCharHalo({col}, {maxy-row+1.3}, "{label}");\n')
+                fout.write (f'    drawCharHaloBold({col}, {maxy-row+1.3}, "{label}");\n')
             fout.write ('  }\n')    # Close unused output label halos color block
-        # Draw unused output labels in grey (foreground layer)
+        # Draw unused output labels in grey (foreground layer) - BOLD
         if unused_outputs:
             fout.write ('  color("Grey") linear_extrude(height=1.2) {\n')
             for row, col, label in unused_outputs:
                 # Draw at output position (above node)
-                fout.write (f'    drawChar({col}, {maxy-row+1.3}, "{label}");\n')
+                fout.write (f'    drawCharBold({col}, {maxy-row+1.3}, "{label}");\n')
             fout.write ('  }\n')    # Close unused output labels color block
 
         # Use label-based approach for color assignment (more robust than node extent detection)
