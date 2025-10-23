@@ -624,6 +624,18 @@ def process(idata, ofile, custom_colors=None):
 
             paths.append(path)
 
+    # Build sets of output and input columns from traced paths
+    output_cols = set()
+    input_cols = set()
+    col_to_output_index = {}  # Map column → path index (for out1/out2 distinction)
+
+    for idx, path in enumerate(paths):
+        if path.start_col is not None:
+            output_cols.add(path.start_col)
+            col_to_output_index[path.start_col] = idx
+        if path.end_col is not None:
+            input_cols.add(path.end_col)
+
     def aColor(n):  # Return nth entry from list of colors
         # Default colors: ColorBrewer's Paired palette (12 colors)
         # Designed for categorical data with built-in light-dark pairing
@@ -744,13 +756,32 @@ def process(idata, ofile, custom_colors=None):
             # Not a negation pattern, add as is
             combined_chars.append((row, col, char))
 
+        # Find rows that contain "=" (truth table rows)
+        rows_with_equals = {}  # row → column position of "="
+        for row, col, text in combined_chars:
+            if "=" in text:
+                # Find position of "=" within the text
+                eq_pos = text.index("=")
+                rows_with_equals[row] = col + eq_pos
+
         if combined_chars:
             fout.write('  color("Black") linear_extrude(height=1.2) {\n')
             for row, col, text in combined_chars:
                 # Escape special characters for OpenSCAD
                 escaped_text = text.replace("\\", "\\\\").replace('"', '\\"')
-                # Use bold for output labels (first label row), regular for input labels
-                if output_row is not None and row == output_row:
+
+                # Determine if this character should be bold (is an output)
+                is_output = False
+
+                # Check if in an output column
+                if col in output_cols:
+                    is_output = True
+                # Check if after "=" sign (truth table outputs)
+                elif row in rows_with_equals and col > rows_with_equals[row]:
+                    is_output = True
+
+                # Use appropriate drawing function
+                if is_output:
                     fout.write(f'    drawCharBold({col}, {maxy - row}, "{escaped_text}");\n')
                 else:
                     fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
