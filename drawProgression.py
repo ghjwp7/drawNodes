@@ -63,6 +63,13 @@ module drawCharHaloBoldItalic(x,y,t) {
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 }
+module drawArrow(x, y) {
+  // Draw downward-pointing triangle at position (x, y)
+  // y is the top of the input row, arrow points down into it
+  // Base is 1.875x wider than line width, height is 1.25x line width
+  translate(scale*[x, y, 0])
+    polygon([[0, 0], [-1.875*wFrac*scale, 1.25*wFrac*scale], [1.875*wFrac*scale, 1.25*wFrac*scale]]);
+}
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
     intersection() {
@@ -361,6 +368,12 @@ class Path:
                 base = min(maxy - last_d.row, maxy - self.end_row)
                 length = abs(last_d.row - self.end_row)
                 fout.write(f"    drawV({last_d.col}, {base}, {length});\n")
+
+            # Draw arrow at end of vertical line (where path terminates)
+            # Arrow is centered on the trace column (col+0.5 due to wf offset)
+            # Position at base+1 to match where drawV ends the vertical line
+            if self.end_col is not None:
+                fout.write(f"    drawArrow({self.end_col+0.5}, {maxy - self.end_row + 1});\n")
 
     def __repr__(self):
         return f"Path({self.label}, node={self.node_index}, start=({self.start_row},{self.start_col}), end=({self.end_row},{self.end_col}), segments={len(self.junctions)})"
