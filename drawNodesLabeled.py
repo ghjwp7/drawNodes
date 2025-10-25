@@ -107,6 +107,8 @@ module drawCharBold(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
 module drawCharBoldItalic(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+module drawCharItalic(x,y,t)
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
 module drawCharHalo(x,y,t) {
   // Regular font halo with 4-directional shifts for complete outline
   translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
@@ -127,6 +129,13 @@ module drawCharHaloBoldItalic(x,y,t) {
   translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+}
+module drawCharHaloItalic(x,y,t) {
+  // Italic font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
@@ -329,17 +338,18 @@ class Edge:
             layer: 'halo' for white background layer, 'label' for actual label
         """
         # Use matching font style for halos and labels
-        # Bold for out1, bold italic for out2, regular for inputs
+        # Bold for out1, bold italic for out2
+        # Italic for inputs from out2, regular for inputs from out1
         if layer == 'halo':
             draw_func_output = 'drawCharHaloBoldItalic' if self.is_out2 else 'drawCharHaloBold'
-            draw_func_input = 'drawCharHalo'
+            draw_func_input = 'drawCharHaloItalic' if self.is_out2 else 'drawCharHalo'
         else:
             draw_func_output = 'drawCharBoldItalic' if self.is_out2 else 'drawCharBold'
-            draw_func_input = 'drawChar'
+            draw_func_input = 'drawCharItalic' if self.is_out2 else 'drawChar'
 
         # Draw at output (just above source node at row+1.3) - BOLD or BOLD ITALIC
         fout.write(f'    {draw_func_output}({self.start_col}, {maxy-self.source_node.row+1.3}, "{self.label}");\n')
-        # Draw at input (at input row position, same level as X marks) - REGULAR
+        # Draw at input (at input row position, same level as X marks) - ITALIC if from out2, REGULAR if from out1
         fout.write(f'    {draw_func_input}({self.end_col}, {maxy-self.end_row}, "{self.label}");\n')
 
     def __repr__(self):

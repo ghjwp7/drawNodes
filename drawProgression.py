@@ -42,6 +42,8 @@ module drawCharBold(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold");
 module drawCharBoldItalic(x,y,t)
   translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
+module drawCharItalic(x,y,t)
+  translate (scale*[x,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
 module drawCharHalo(x,y,t) {
   // Regular font halo with 4-directional shifts for complete outline
   translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale);
@@ -63,12 +65,39 @@ module drawCharHaloBoldItalic(x,y,t) {
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Bold Italic");
 }
+module drawCharHaloItalic(x,y,t) {
+  // Italic font halo with 4-directional shifts for complete outline
+  translate (scale*[x-0.04,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x+0.04,y,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
+  translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
+}
 module drawArrow(x, y) {
   // Draw downward-pointing triangle at position (x, y)
   // y is the top of the input row, arrow points down into it
   // Base is 1.875x wider than line width, height is 1.25x line width
   translate(scale*[x, y, 0])
     polygon([[0, 0], [-1.875*wFrac*scale, 1.25*wFrac*scale], [1.875*wFrac*scale, 1.25*wFrac*scale]]);
+}
+module drawDiagonal(x1, y1, x2, y2) {
+  // Draw diagonal line from (x1,y1) to (x2,y2)
+  translate(scale*[x1, y1, 0])
+    rotate([0, 0, atan2((y2-y1)*scale, (x2-x1)*scale)])
+      square([sqrt(pow((x2-x1)*scale, 2) + pow((y2-y1)*scale, 2)), wFrac*scale]);
+}
+module drawDiagonalThin(x1, y1, x2, y2) {
+  // Draw thin diagonal line from (x1,y1) to (x2,y2) - half thickness
+  translate(scale*[x1, y1, 0])
+    rotate([0, 0, atan2((y2-y1)*scale, (x2-x1)*scale)])
+      square([sqrt(pow((x2-x1)*scale, 2) + pow((y2-y1)*scale, 2)), wFrac/2*scale]);
+}
+module drawDiagonalArrow(x, y, angle) {
+  // Draw small arrow at end of diagonal line
+  // angle is in degrees, pointing direction of the arrow
+  // Arrow is smaller than input arrows (0.6x size)
+  translate(scale*[x, y, 0])
+    rotate([0, 0, angle])
+      polygon([[0, 0], [-0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale], [0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale]]);
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
@@ -665,6 +694,13 @@ def process(idata, ofile, custom_colors=None):
         if path.end_col is not None:
             input_cols.add(path.end_col)
 
+    # Track which input positions come from out2 (for italic styling)
+    input_from_out2_positions = set()  # Set of (row, col) tuples
+    for idx, path in enumerate(paths):
+        # Odd indices are out2 paths
+        if idx % 2 == 1 and path.end_row is not None and path.end_col is not None:
+            input_from_out2_positions.add((path.end_row, path.end_col))
+
     def aColor(n):  # Return nth entry from list of colors
         # Default colors: ColorBrewer's Paired palette (12 colors)
         # Designed for categorical data with built-in light-dark pairing
@@ -785,6 +821,63 @@ def process(idata, ofile, custom_colors=None):
             # Not a negation pattern, add as is
             combined_chars.append((row, col, char))
 
+        # Build diagonal lines using existing Path data
+        diagonal_lines = []  # List of (x1, y1, x2, y2) tuples
+
+        if paths:
+            # Group paths by node to get out1/out2 positions
+            nodes_data = {}  # node_index -> {'out1_col': x, 'out2_col': y}
+
+            for path in paths:
+                node_idx = path.node_index
+                if node_idx not in nodes_data:
+                    nodes_data[node_idx] = {}
+
+                # Even indices are out1, odd are out2
+                path_idx = paths.index(path)
+                if path_idx % 2 == 0:
+                    nodes_data[node_idx]['out1_col'] = path.start_col
+                else:
+                    nodes_data[node_idx]['out2_col'] = path.start_col
+
+            # Find all rows that contain '+' characters (operation rows)
+            operation_rows = set()
+            for row, col, text in combined_chars:
+                if text == '+':
+                    operation_rows.add(row)
+
+            # For each operation row, find diagonal lines from in2 to out1
+            # Structure: operation_row has "in1 + in2", result_row (operation_row+1) has outputs
+            for operation_row in sorted(operation_rows):
+                result_row = operation_row + 1
+
+                for node_idx, node_data in nodes_data.items():
+                    if 'out1_col' in node_data and 'out2_col' in node_data:
+                        out1_col = node_data['out1_col']
+
+                        # Find '+' character near this node's outputs (operations are stored as individual chars)
+                        for row, col, text in combined_chars:
+                            if row == operation_row and text == '+':
+                                # Operation starts at col-1, in2 is at col+1
+                                op_start_col = col - 1
+                                in2_col = col + 1
+
+                                # Check if this operation is roughly above this node's outputs
+                                if abs(op_start_col - out1_col) <= 5:
+                                    # Add diagonal from in2 (on operation_row) to out1 (on result_row)
+                                    # Shorten line to avoid obscuring text: start 0.3 below in2, end 0.3 above out1
+                                    # Then shorten by 20% (move each endpoint 10% toward center)
+                                    x1, y1 = in2_col, operation_row + 0.3
+                                    x2, y2 = out1_col, result_row - 0.3
+                                    dx = x2 - x1
+                                    dy = y2 - y1
+                                    new_x1 = x1 + 0.1 * dx
+                                    new_y1 = y1 + 0.1 * dy
+                                    new_x2 = x2 - 0.1 * dx
+                                    new_y2 = y2 - 0.1 * dy
+                                    diagonal_lines.append((new_x1, new_y1, new_x2, new_y2))
+                                    break
+
         # Find rows that contain "=" (truth table rows)
         # Track both the "=" position and which columns are out1 vs out2
         rows_with_equals = {}  # row → column position of "="
@@ -810,6 +903,27 @@ def process(idata, ofile, custom_colors=None):
             if len(chars_after_eq) >= 2:
                 truth_table_out2_cols.add(chars_after_eq[1][0])
 
+        # Draw diagonal lines from second input to first output
+        if diagonal_lines:
+            fout.write('  color("Gray") linear_extrude(height=1.1) {\n')
+            for in2_col, in2_row, out1_col, out1_row in diagonal_lines:
+                # Draw thin diagonal line from (in2_col, in2_row) to (out1_col, out1_row)
+                y1 = maxy - in2_row
+                y2 = maxy - out1_row
+                fout.write(f'    drawDiagonalThin({in2_col}, {y1}, {out1_col}, {y2});\n')
+                # Draw arrow at end point, centered on line width
+                # Calculate perpendicular offset to center arrow on line thickness
+                line_angle = f"atan2(({y2}-{y1})*scale, ({out1_col}-{in2_col})*scale)"
+                perp_angle = f"({line_angle} + 90)"
+                # Offset by half the line width in perpendicular direction
+                offset_x = f"wFrac/4*cos({perp_angle})"
+                offset_y = f"wFrac/4*sin({perp_angle})"
+                arrow_x = f"({out1_col} + {offset_x})"
+                arrow_y = f"({y2} + {offset_y})"
+                arrow_angle = f"{line_angle} + 90"
+                fout.write(f'    drawDiagonalArrow({arrow_x}, {arrow_y}, {arrow_angle});\n')
+            fout.write('  }\n')
+
         if combined_chars:
             fout.write('  color("Black") linear_extrude(height=1.2) {\n')
             for row, col, text in combined_chars:
@@ -819,6 +933,7 @@ def process(idata, ofile, custom_colors=None):
                 # Determine which type of character this is
                 is_out1 = False
                 is_out2 = False
+                is_input_from_out2 = False
 
                 # Check if in an out1 column
                 if col in out1_cols:
@@ -832,12 +947,17 @@ def process(idata, ofile, custom_colors=None):
                 # Check if in truth table out2 position
                 elif col in truth_table_out2_cols:
                     is_out2 = True
+                # Check if this is an input position from out2
+                elif (row, col) in input_from_out2_positions:
+                    is_input_from_out2 = True
 
                 # Use appropriate drawing function
                 if is_out1:
                     fout.write(f'    drawCharBold({col}, {maxy - row}, "{escaped_text}");\n')
                 elif is_out2:
                     fout.write(f'    drawCharBoldItalic({col}, {maxy - row}, "{escaped_text}");\n')
+                elif is_input_from_out2:
+                    fout.write(f'    drawCharItalic({col}, {maxy - row}, "{escaped_text}");\n')
                 else:
                     fout.write(f'    drawChar({col}, {maxy - row}, "{escaped_text}");\n')
             fout.write("  }\n")
