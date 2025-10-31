@@ -78,21 +78,14 @@ module drawArrow(x, y) {
     polygon([[0, 0], [-1.875*wFrac*scale, -1.25*wFrac*scale], [1.875*wFrac*scale, -1.25*wFrac*scale]]);
 }
 module drawXorSymbol(x, y, xfar) {
-  // Draw circled plus (XOR symbol) in center of node
+  // Draw plus symbol (addition) in center of node
   // x, y is bottom-left of node, xfar is node width
   cx = x + xfar/2;
-  cy = y + 0.5;
-  radius = 0.3;
-  ringThickness = wFrac/3;
+  cy = y + 0.35;
   barWidth = wFrac/3;
   barHalfLen = 0.2;
 
   translate(scale*[cx, cy, 0]) {
-    // Circle ring
-    difference() {
-      circle(r=scale*radius);
-      circle(r=scale*(radius-ringThickness));
-    }
     // Horizontal bar of +
     translate(scale*[-barHalfLen, -barWidth/2, 0])
       square(scale*[2*barHalfLen, barWidth]);
@@ -137,11 +130,13 @@ module drawCharHaloItalic(x,y,t) {
   translate (scale*[x,y-0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
   translate (scale*[x,y+0.04,0]) text(t, size=textFrac*scale, font=":style=Italic");
 }
-module drawCorner(x,y,dx,dy, label="")
+module drawCorner(x,y,dx,dy, label="", arrow_adjust=0)
   translate (scale*[x,y,0]) {
     //text(label, size=textFrac*scale/2); // uncomment to see corner#
     intersection() {
-      square(scale*[1,1], center=false);
+      // When dy==1 (corner extends upward) and arrow_adjust>0, reduce square height
+      // to prevent corner from protruding through arrow at the top
+      square(scale*[1, (dy == 1 ? 1-arrow_adjust : 1)], center=false);
       translate(scale*[dx,dy,0])
         difference() {
           circle(d=scale*(1+wFrac));
@@ -432,14 +427,17 @@ def process(idata, ofile, custom_colors=None):
                   '#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928')
         return colist[(n if n else 0)%len(colist)]
 
-    def drawCorner(c):
+    def drawCorner(c, arrow_adjust=0):
         dy, dx = c.code&1, c.code//2
-        fout.write (f'    drawCorner({c.col}, {maxy-c.row}, {dx},{dy}, "{c.num}");\n')
-    def drawV(c, erow):
+        fout.write (f'    drawCorner({c.col}, {maxy-c.row}, {dx},{dy}, "{c.num}", {arrow_adjust});\n')
+    def drawV(c, erow, arrow_adjust=0):
         if not erow==c.row:
-            base = min(maxy-c.row, maxy-erow)
+            # Shift base downward and reduce length to shorten from top (arrow end)
+            # Opposite direction from drawProgression since arrows point up, not down
+            base = min(maxy-c.row, maxy-erow) - arrow_adjust
             #fout.write (f'    drawV({c.col}, {base}, {abs(c.row+1-erow)});\n')
-            fout.write (f'    drawV({c.col}, {base}, {abs(c.row-erow)-1});\n')
+            length = abs(c.row-erow) - 1 - arrow_adjust
+            fout.write (f'    drawV({c.col}, {base}, {length});\n')
     def drawH(c, ecol):
         if not ecol==c.col:
             base = min(c.col, ecol)
@@ -485,11 +483,16 @@ def process(idata, ofile, custom_colors=None):
     def colorTrace(c, d):
         if c.canon(d) in drawn: return
         code = c.code
+
+        # If drawing to a node destination, shorten the line to end inside the arrow
+        # Arrow height is 1.25*wFrac, adjust to stop just inside arrow tip
+        arrow_adjust = 0.13 if d.code >= HM else 0
+
         # Draw c to d
         if code<CL:
-            drawCorner(c)
+            drawCorner(c, arrow_adjust)
         drawH(c, d.col) # Draw to end-column, if ok
-        drawV(c, d.row) # Draw to end-row, if ok
+        drawV(c, d.row, arrow_adjust) # Draw to end-row, with optional arrow adjustment
         drawn[c.canon(d)] = 1
 
         # Draw arrowhead if d is a destination node (HM or HX, not XM)
@@ -600,7 +603,7 @@ def process(idata, ofile, custom_colors=None):
                     fout.write (f'    drawNode({b.col}, {maxy-b.row},{xfar});\n')
             fout.write ('  }\n')    # Close drawNode's color block
 
-        # Draw XOR symbols (circled plus) in center of each node
+        # Draw plus symbols (addition) in center of each node
         fout.write ('  color("Black") linear_extrude(height=1.1) {\n')
         for b in nodes:
             if b.code == HM:
@@ -608,7 +611,7 @@ def process(idata, ofile, custom_colors=None):
                 while corners[b.num+xfar].col==b.col+xfar and corners[b.num+xfar].code==HX:
                     xfar += 1
                 fout.write (f'    drawXorSymbol({b.col}, {maxy-b.row},{xfar});\n')
-        fout.write ('  }\n')    # Close XOR symbol color block
+        fout.write ('  }\n')    # Close plus symbol color block
 
         if options['text']:     # Open show-loci-numbers color block?
             fout.write (f'  color(c="{colorFix(options["text"])}") linear_extrude(height=1)' + ' {\n')

@@ -7,6 +7,7 @@
 from sys import argv
 from collections import deque
 import subprocess
+import math
 
 
 def heading(ofile):
@@ -394,8 +395,11 @@ class Path:
             # The last junction (last_d) should be at or before the input row
             # If it's before (row < end_row), draw one more vertical segment
             if last_d.row < self.end_row:
-                base = min(maxy - last_d.row, maxy - self.end_row)
-                length = abs(last_d.row - self.end_row)
+                # Shorten line by ~0.7*wFrac (wFrac=0.25, so 0.175) to end inside the arrow
+                # Arrow height is 1.25*wFrac, so this stops the line ~56% into the arrow body
+                # Adjust both base (shift up) and length (shorten) to remove from bottom of line
+                base = min(maxy - last_d.row, maxy - self.end_row) + 0.175
+                length = abs(last_d.row - self.end_row) - 0.175
                 fout.write(f"    drawV({last_d.col}, {base}, {length});\n")
 
             # Draw arrow at end of vertical line (where path terminates)
@@ -867,14 +871,20 @@ def process(idata, ofile, custom_colors=None):
                                     # Add diagonal from in2 (on operation_row) to out1 (on result_row)
                                     # Shorten line to avoid obscuring text: start 0.3 below in2, end 0.3 above out1
                                     # Then shorten by 20% (move each endpoint 10% toward center)
+                                    # Plus extra shortening at arrow end to stop inside arrow
                                     x1, y1 = in2_col, operation_row + 0.3
                                     x2, y2 = out1_col, result_row - 0.3
                                     dx = x2 - x1
                                     dy = y2 - y1
+                                    length = math.sqrt(dx * dx + dy * dy)
+                                    # Diagonal arrow height is 0.6*1.25*wFrac = 0.1875
+                                    # Shorten by ~0.7 of that = 0.13 units along the line
+                                    # Keep x1, y1 as original position (for translate), only shorten x2, y2
+                                    arrow_adjust = 0.13
                                     new_x1 = x1 + 0.1 * dx
                                     new_y1 = y1 + 0.1 * dy
-                                    new_x2 = x2 - 0.1 * dx
-                                    new_y2 = y2 - 0.1 * dy
+                                    new_x2 = x2 - 0.1 * dx - arrow_adjust * dx / length
+                                    new_y2 = y2 - 0.1 * dy - arrow_adjust * dy / length
                                     diagonal_lines.append((new_x1, new_y1, new_x2, new_y2))
                                     break
 

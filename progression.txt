@@ -5,20 +5,20 @@
 / | |  __   ___\____|_  | 
 | | | /  \ /   |    | \ |
 | | | |  | | | |    | | |
-| | f c  | | c f    | e b    a+c=b e	
-f+b      c+e      x+f        a+e=f c	
-    a d      d a      f c    b+d=c f	
-a+c      d+f      x+a        b+f=a d	
-    b e      e b      a d    c+a=b e	
-b+d      e+a      x+b        c+e=d a	
-    c f      f c      b e    d+b=c f	
-c+e      f+b      x+c        d+f=e b	
-    d a      a d      c f    e+a=f c	
-d+f      a+c      x+d        e+c=d a	
-    e b      b e      d a    f+b=a d	
-e+a      b+d      x+e        f+d=e b	
-    f c      c f      e b    x+n=n ~n
-f+b      c+e      x+f        
+| | f c  | | c f    | e b	
+f+b      c+e      x+f        b+f=a d
+    a d      d a      f c    f+b=a d
+a+c      d+f      x+a        a+c=b e
+    b e      e b      a d    c+a=b e
+b+d      e+a      x+b        b+d=c f
+    c f      f c      b e    d+b=c f
+c+e      f+b      x+c        c+e=d a
+    d a      a d      c f    e+c=d a
+d+f      a+c      x+d        d+f=e b
+    e b      b e      d a    f+d=e b
+e+a      b+d      x+e        a+e=f c
+    f c      c f      e b    e+a=f c
+                             x+n=n -n    
 =
 
 =4_2_1_progression
@@ -29,43 +29,55 @@ f+b      c+e      x+f
 | | |  __  /  _|____  | \    |     
 | | | /  \ | / |    \ | |    |
 | | | |  | | | |    | | |    | | |
-| | f c  | | c f    | b e    | e b    a+c=b e	
-f+b      c+e      x+c      x+f        a+e=f c	
-    a d      d a      c f      f c    b+d=c f	
-a+c      d+f      x+d      x+a        b+f=a d	
-    b e      e b      d a      a d    c+a=b e	
-b+d      e+a      x+e      x+b        c+e=d a	
-    c f      f c      e b      b e    d+b=c f	
-c+e      f+b      x+f      x+c        d+f=e b	
-    d a      a d      f c      c f    e+a=f c	
-d+f      a+c      x+a      x+d        e+c=d a	
-    e b      b e      a d      d a    f+b=a d	
-e+a      b+d      x+b      x+e        f+d=e b	
-    f c      c f      b e      e b    x+n=n ~n
-f+b      c+e      x+c      x+f        
+| | f c  | | c f    | b e    | e b	
+f+b      c+e      x+c      x+f        b+f=a d
+    a d      d a      c f      f c    f+b=a d
+a+c      d+f      x+d      x+a        a+c=b e
+    b e      e b      d a      a d    c+a=b e
+b+d      e+a      x+e      x+b        b+d=c f
+    c f      f c      e b      b e    d+b=c f
+c+e      f+b      x+f      x+c        c+e=d a
+    d a      a d      f c      c f    e+c=d a
+d+f      a+c      x+a      x+d        d+f=e b
+    e b      b e      a d      d a    f+d=e b
+e+a      b+d      x+b      x+e        a+e=f c
+    f c      c f      b e      e b    e+a=f c
+f+b      c+e      x+c      x+f        x+n=n -n
 =
 =4_2_1_progression_tight
-   ____________________      
-  /  _____________     \     
- _|_/_______      \    |     
-/ | |     __\_____|    |     
-| | | _  /  |___  |\   |     
-| | |/ \ | /|   \ ||   |     
-| | || | | ||   | ||   |     
-| | || | | ||   | ||   |     
-| | fc | | cf   | be   | eb    a+c=b e	
-f+b    c+e    x+c    x+f       a+e=f c	
-    ad     da     cf     fc    b+d=c f	
-a+c    d+f    x+d    x+a       b+f=a d	
-    be     eb     da     ad    c+a=b e	
-b+d    e+a    x+e    x+b       c+e=d a	
-    cf     fc     eb     be    d+b=c f	
-c+e    f+b    x+f    x+c       d+f=e b	
-    da     ad     fc     cf    e+a=f c	
-d+f    a+c    x+a    x+d       e+c=d a	
-    eb     be     ad     da    f+b=a d	
-e+a    b+d    x+b    x+e       f+d=e b	
-    fc     cf     be     eb    x+n=n -n
-f+b    c+e    x+c    x+f        
+   ____________________
+  /  _____________     \
+ _|_/_______      \    |
+/ | |     __\_____|    |
+| | | _  /  |___  |\   |
+| | |/ \ | /|   \ ||   |
+| | || | | ||   | ||   |
+| | || | | ||   | ||   |  
+| | fc | | cf   | be   | eb
+f+b    c+e    x+c    x+f       b+f=a d
+    ad     da     cf     fc    f+b=a d
+a+c    d+f    x+d    x+a       a+c=b e
+    be     eb     da     ad    c+a=b e
+b+d    e+a    x+e    x+b       b+d=c f
+    cf     fc     eb     be    d+b=c f
+c+e    f+b    x+f    x+c       c+e=d a
+    da     ad     fc     cf    e+c=d a
+d+f    a+c    x+a    x+d       d+f=e b
+    eb     be     ad     da    f+d=e b
+e+a    b+d    x+b    x+e       a+e=f c
+    fc     cf     be     eb    e+a=f c
+f+b    c+e    x+c    x+f       x+n=n -n
 =
+
+
+
+
+
+
+
+
+
+
+
+
 
