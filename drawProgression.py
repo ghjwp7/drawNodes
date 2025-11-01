@@ -98,7 +98,7 @@ module drawDiagonalArrow(x, y, angle) {
   // Arrow is smaller than input arrows (0.6x size)
   translate(scale*[x, y, 0])
     rotate([0, 0, angle])
-      polygon([[0, 0], [-0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale], [0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale]]);
+      polygon([[0, -1], [-0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale], [0.6*1.875*wFrac*scale, 0.6*1.25*wFrac*scale]]);
 }
 module drawCorner(x,y,dx,dy, label="")
   translate (scale*[x,y,0]) {
