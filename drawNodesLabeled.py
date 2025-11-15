@@ -28,8 +28,8 @@ def heading(ofile):
 /* [Label Colors] */
 // Color for edge labels
 label_color = "Black";
-// Color for label halo/outline (using over-bright RGB to compensate for lighting)
-label_halo_color = [1.5,1.5,1.5];
+// Color for label halo/outline
+label_halo_color = [1.0,1.0,1.0];
 
 // Number of sides for round things
 $fn=31;
@@ -269,12 +269,14 @@ def generate_png(ofile, imgsize, camera, border=0):
 
             # Make background transparent, trim excess, and add border using ImageMagick
             # Cornfield colorscheme uses RGB(255,255,229) as background
+            # Also make shaded white RGB(202,198,198) transparent (from OpenSCAD lighting on white)
             # Use -fuzz to handle anti-aliasing at edges
             convert_cmd = [
                 'convert',
                 f'{ofile}.png',
                 '-fuzz', '5%',
                 '-transparent', 'rgb(255,255,229)',
+                '-transparent', 'rgb(202,198,198)',
                 '-trim',  # Always trim to remove excess transparent border
             ]
             # Add border if requested
