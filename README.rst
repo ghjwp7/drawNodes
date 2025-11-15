@@ -11,12 +11,26 @@ line-art format.
 Description
 ===========
 
-Given an ascii graphic of a graph, drawn with ``/ # \ _ X`` and space
-characters, ``drawNodes`` writes a .scad file to draw that graph,
-using OpenSCAD 2D graphics, extruded to 3D.  Lines containing
-characters other than the six characters listed above are treated as
-text lines, and may be displayed or not in output, depending on
-command-line options.
+The drawNodes package provides three Python programs for converting ASCII art
+graphs into OpenSCAD files and PNG images with transparent backgrounds:
+
+**drawNodes.py** - Original node graph renderer
+  Renders basic node graphs with colored traces, ideal for simple diagrams.
+
+**drawNodesLabeled.py** - Edge labeling with font styling
+  Adds edge labels (lowercase letters) at both output and input positions,
+  with bold/italic font styling, white halos for readability, node outlines,
+  addition symbols, arrowheads, and complement circles on second outputs.
+
+**drawProgression.py** - Progression/state-transition diagrams
+  Specialized for showing state progressions with path tracing, downward
+  arrows at inputs, and diagonal flow indicators for data flow visualization.
+
+All three programs read ASCII graphics drawn with ``/ # \ _ X`` and space
+characters, and write .scad files using OpenSCAD 2D graphics extruded to 3D.
+Lines containing characters other than the drawing characters are treated as
+text lines, and may be displayed or not in output, depending on command-line
+options.
 
 The rest of this file has the following sections:
 
@@ -24,14 +38,23 @@ The rest of this file has the following sections:
  • `Running the program`_
  • `Command-line Options`_
  • `Command-line Option Examples`_
+ • `Automatic PNG Generation`_
+ • `@Directives in Input Files`_
+
+   - `Available @Directives`_
+   - `Example Input File with @Directives`_
+
  • `Input file formats`_
  • `X-marks and Trace Colors`_
 
    - `Default Color Sequence`_
    - `Custom Color Sequences`_
 
+ • `Font Styling in drawNodesLabeled.py`_
+ • `Visual Elements in drawNodesLabeled.py`_
+ • `Visual Elements in drawProgression.py`_
  • `Graph Parsing limitations`_
- • `How to make a .png output`_ with openscad results`_
+ • `How to make a .png output`_
  • `Automatic updates in OpenSCAD`_
  • `Automatically running drawNodes upon changes to your input file`_
 
@@ -39,10 +62,12 @@ Software requirements
 =====================
 
  • Install python3 if your system lacks it
- • Install ``drawNodes.py`` as a findable executable file, so that you can
-   start it with a command like ``./drawNodes.py`` or ``drawNodes.py``
-   or ``python3 drawNodes.py``, etc
+ • Install ``drawNodes.py``, ``drawNodesLabeled.py``, and ``drawProgression.py``
+   as findable executable files, so that you can start them with commands like
+   ``./drawNodes.py`` or ``python3 drawNodes.py``, etc
  • Install OpenSCAD per its instructions
+ • Install ImageMagick (provides the ``convert`` command) for automatic PNG
+   generation with transparent backgrounds
  • Install a picture viewer (such as gpicview, eog, xv, etc)
 
 Running the program
@@ -97,6 +122,89 @@ alpha=0x10) with text lines suppressed::
 
   drawNodes.py bigdata text=beige loci=green node=''
   drawNodes.py bigdata loci=red node=00ff0010
+
+Automatic PNG Generation
+=========================
+
+All three programs support automatic PNG generation with transparent backgrounds
+using the ``png=`` command-line option::
+
+  drawNodesLabeled.py myfile png=true
+
+This automatically:
+
+ • Generates .scad files from your ASCII diagrams
+ • Renders PNG images using OpenSCAD
+ • Makes backgrounds transparent using ImageMagick
+ • Trims excess whitespace
+ • Optionally adds borders
+
+Camera position and image size are automatically calculated from your diagram's
+bounding box. You can override these with @directives (see next section).
+
+@Directives in Input Files
+===========================
+
+You can control PNG rendering using @directives in your input file. These can be:
+
+ • **Global** - Placed before the first ``=filename`` line to set defaults for all diagrams
+ • **Per-diagram** - Placed between ``=filename`` and ``=`` to override global settings
+
+Available @Directives
+---------------------
+
+**@imgsize=WIDTH,HEIGHT**
+  PNG output dimensions in pixels. If not specified, dimensions are auto-calculated
+  from the diagram's bounding box (rounded to nearest 50 pixels).
+
+  Example: ``@imgsize=800,600``
+
+**@camera=X,Y,Z**
+  Camera position for OpenSCAD orthographic projection. If not specified, position
+  is auto-calculated to center the diagram. The X,Y values center on the diagram,
+  and Z controls the viewing distance (larger Z = more zoomed out).
+
+  Example: ``@camera=150.0,75.0,250.0``
+
+**@border=PIXELS**
+  Border size in pixels added around the trimmed image. Default is 0 (trimmed with
+  no border). Negative values crop pixels instead of adding border.
+
+  Examples: ``@border=50`` (50px border), ``@border=0`` (no border), ``@border=-10`` (crop 10px)
+
+**@colors=COLOR1,COLOR2,...**
+  Custom color sequence for traces. Overrides the default ColorBrewer Paired palette.
+  Colors are assigned sequentially from left to right based on output column positions.
+  Accepts named colors (Red, Blue), hex RGB (FF0000), or hex RGBA (FF000080).
+
+  Example: ``@colors=Red,Blue,Green,#FF00FF,Orange``
+
+Example Input File with @Directives
+------------------------------------
+
+::
+
+  # Global defaults for all diagrams
+  @border=50
+  @colors=A6CEE3,1F78B4,B2DF8A,33A02C
+
+  =diagram1
+  # This diagram uses global settings
+       ___
+      / X \
+      ### |
+      \_|_/
+  =
+
+  =diagram2
+  # This diagram overrides imgsize and border
+  @imgsize=1200,400
+  @border=0
+       ___
+      / X \
+      ### |
+      \_|_/
+  =
 
 Input File Formats
 ===============================
@@ -198,6 +306,76 @@ Example with custom colors::
 In this example, the leftmost output gets color #1F78B4 (blue), the
 second output gets #E31A1C (red), and so on from left to right.
 
+Font Styling in drawNodesLabeled.py
+====================================
+
+The ``drawNodesLabeled.py`` program uses edge labels (lowercase letters) to track
+data flow through the graph. Labels appear at both the output position (above
+the source node) and input position (at the destination). Font styling distinguishes
+different output types and data flow paths:
+
+**Output Labels** (above nodes)
+  • **out1** (first/left output): Bold font
+  • **out2** (second/right output with complement circle): Bold Italic font
+
+**Input Labels** (at destinations)
+  • **From out1**: Regular font
+  • **From out2**: Italic font
+
+**Unused Outputs**
+  • Displayed in grey with same bold/bold-italic styling as used outputs
+
+**Label Halos**
+  All labels include white outlines (halos) for readability when labels appear
+  over dark-colored edges. The halo color is ``[1.0, 1.0, 1.0]`` (white) and
+  can be customized via OpenSCAD's Customizer (``label_halo_color`` parameter).
+
+This font styling system allows you to trace data flow visually: if you see an
+italic input label, you know it came from an out2 (complemented) output.
+
+Visual Elements in drawNodesLabeled.py
+=======================================
+
+**Node Outlines**
+  Black borders around all nodes for visual definition
+
+**Addition Symbols (+)**
+  Plus symbols in the center of each node indicate the addition/XOR operation
+
+**Arrowheads at Inputs**
+  Upward-pointing triangular arrows show where edges terminate at node inputs.
+  Arrow dimensions: base is 1.875× line width, height is 1.25× line width.
+  Edges are automatically shortened to terminate inside the arrow tips.
+
+**Complement Circles**
+  Small circles on the second output (out2/rightmost) of each node indicate
+  complemented (inverted) output
+
+**X Marks**
+  Grey "X" characters mark input positions, matching the color of unused outputs
+
+Visual Elements in drawProgression.py
+======================================
+
+The ``drawProgression.py`` program specializes in showing state transitions and
+data flow progressions with these visual indicators:
+
+**Downward-Pointing Arrows**
+  Arrows at input positions show where paths terminate. Same dimensions as
+  drawNodesLabeled.py arrows: base 1.875× line width, height 1.25× line width.
+
+**Diagonal Flow Indicators**
+  Thin grey diagonal lines with directional arrows show data flow from in2
+  (second input) to out1 (first output). These indicators help visualize how
+  complemented inputs affect non-complemented outputs.
+
+**Path Tracing**
+  Follows UP → ACROSS → DOWN pattern for state progressions, with corner
+  swapping for better horizontal flow visualization.
+
+**Unconnected Inputs**
+  Inputs marked with 'x' in the ASCII diagram remain unconnected in the output.
+
 Graph Parsing Limitations
 =========================
 
@@ -214,9 +392,21 @@ turns work ok. See example *235long*.
 How to make a .png output
 ==========================
 
-After running drawNodes, open a resulting output file in openscad, and
-then:
+**Automatic PNG Generation (Recommended)**
 
+The easiest way to generate PNG files is using the ``png=`` command-line option::
+
+  drawNodesLabeled.py myfile png=true
+
+This automatically generates PNG files with transparent backgrounds, auto-calculated
+camera positioning, and trimmed borders. See the `Automatic PNG Generation`_ section
+for details on controlling output with @directives.
+
+**Manual PNG Export via OpenSCAD**
+
+Alternatively, you can manually export PNGs after running drawNodes:
+
+ • Open the .scad file in OpenSCAD
  • Press ``ctrl-4`` or click the ``Top`` button (icon: cube with up triangle)
  • If axes are on, press ``ctrl-2`` or click ``Show Axes`` (icon:
    three lines from a corner) to turn off axis display
@@ -225,6 +415,13 @@ then:
  • Click ``File / Export / Export-as-Image``
  • Enter or accept a name ending with ``.png``
  • Use a picture viewer to check the ``.png`` file
+
+Note: Manual exports do not automatically apply transparent backgrounds. For
+transparent backgrounds, use automatic PNG generation or post-process with
+ImageMagick::
+
+  convert input.png -fuzz 5% -transparent 'rgb(255,255,229)' \\
+    -transparent 'rgb(202,198,198)' -trim output.png
 
 Automatic updates in OpenSCAD 
 ========================================
