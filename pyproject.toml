@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drawnodes"
+version = "0.1.0"
+description = "Generate annotated graph diagrams from ASCII art using OpenSCAD"
+readme = "README.rst"
+requires-python = ">=3.6"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "Stuart Squires"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Multimedia :: Graphics",
+]
+keywords = ["graph", "visualization", "diagram", "openscad", "ascii-art"]
+
+[project.urls]
+Homepage = "https://github.com/stuartsquires/drawNodes"
+Repository = "https://github.com/stuartquires/drawNodes"
+
+[project.scripts]
+drawnodes = "drawnodes.draw_nodes:main"
+drawnodes-labeled = "drawnodes.draw_nodes_labeled:main"
+drawprogression = "drawnodes.draw_progression:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "mypy", "restview"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["drawnodes*"]
+exclude = ["tests*"]
