@@ -12,9 +12,9 @@
 # value is an input file name or is a color name or number (6-digit
 # hex RGB or 8-digit hex RGBA).  See README.rst for examples.
 
-# Note, default for `file` is 'aTestSet', which is a file of test
+# Note, default for `file` is 'validation/draw_nodes_labeled/labeled_test_set.txt', which is a file of test
 # examples.  Note, a bare value is treated like file=value.  For
-# example, "drawNodes myfile" reads data from myfile with other
+# example, "drawNodesLabeled myfile" reads data from myfile with other
 # options defaulted.
 
 from sys import argv
@@ -352,7 +352,7 @@ class Edge:
     def __repr__(self):
         return f'Edge({self.label}: ({self.start_row},{self.start_col}) -> ({self.end_row},{self.end_col}))'
 #==============================================================
-def process(idata, ofile, custom_colors=None):
+def process(idata, ofile, custom_colors=None, options=None):
     UR, LR, UL, LL, CL, XM, HM, HX = range(8) # Set Corner & Mark Codes
     def upChar(dx):   # Return neighbor char from previous line
         if linn>0 and (0<= col+dx < len(idata[linn-1])):
@@ -772,7 +772,7 @@ USAGE:
 
 COMMAND-LINE OPTIONS:
     file=FILENAME       Input file containing ASCII graphs
-                        (default: aTestSet)
+                        (default: validation/draw_nodes_labeled/labeled_test_set.txt)
                         Note: Bare filename also works (e.g., 'myfile')
 
     node=COLOR          Color for node bodies
@@ -840,139 +840,143 @@ For more information, see README.rst
 """
     print(help_text)
 #======================================================================
-# Set up default options to suppress loci numbers; suppress text;
-# paint node bodies in a pale blue; and by default read from t1-data.
-options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'aTestSet', 'png':''}
+def main():
+    # Set up default options to suppress loci numbers; suppress text;
+    # paint node bodies in a pale blue; and by default read from t1-data.
+    options = { 'loci':'', 'text':'', 'node':'0000FF20', 'file':'validation/draw_nodes_labeled/labeled_test_set.txt', 'png':''}
 
-# Check for help flag first
-if '--help' in argv or '-h' in argv:
-    print_help()
-    exit(0)
+    # Check for help flag first
+    if '--help' in argv or '-h' in argv:
+        print_help()
+        exit(0)
 
-arn, idata = 0, []
-while (arn := arn+1) < len(argv):
-    if '=' in argv[arn]:
-        opt, val = argv[arn].split('=')
-        options[opt] = val
-    else: options['file'] = argv[arn] # Default case = file name
+    arn, idata = 0, []
+    while (arn := arn+1) < len(argv):
+        if '=' in argv[arn]:
+            opt, val = argv[arn].split('=')
+            options[opt] = val
+        else: options['file'] = argv[arn] # Default case = file name
 
-# Parse global options (before first diagram)
-global_options = {}
-with open(options['file'], 'r') as fin:
-    # First pass: read global options (lines before first =)
-    while True:
-        pos = fin.tell()  # Save position before reading
-        a = fin.readline()
-        if not a:  # EOF
-            break
-        if a[0] == '=':
-            # Found first diagram, go back to this line
-            fin.seek(pos)
-            break
-        # Parse global options
-        a = a.rstrip()
-        if a.startswith('@imgsize='):
-            parts = a[9:].split(',')
-            if len(parts) == 2:
-                try:
-                    global_options['imgsize'] = (int(parts[0]), int(parts[1]))
-                except ValueError:
-                    print(f"Warning: Invalid global imgsize format: {a}")
-        elif a.startswith('@camera='):
-            parts = a[8:].split(',')
-            if len(parts) == 3:
-                try:
-                    global_options['camera'] = (float(parts[0]), float(parts[1]), float(parts[2]))
-                except ValueError:
-                    print(f"Warning: Invalid global camera format: {a}")
-        elif a.startswith('@border='):
-            try:
-                global_options['border'] = float(a[8:])
-            except ValueError:
-                print(f"Warning: Invalid global border format: {a}")
-        elif a.startswith('@colors='):
-            try:
-                color_string = a[8:].strip()
-                if color_string:
-                    global_options['colors'] = [c.strip() for c in color_string.split(',')]
-            except Exception as e:
-                print(f"Warning: Invalid global colors format: {a} - {e}")
-
-    # Second pass: process diagrams
-    while a := fin.readline():
-        # Read text for one diagram; send that text to process().
-        if a[0]=='=':           # Detect opening =
-            idata, ofile = [], a[1:].rstrip()
-            # Initialize with global defaults
-            imgsize = global_options.get('imgsize', None)
-            camera = global_options.get('camera', None)
-            border = global_options.get('border', None)
-            custom_colors = global_options.get('colors', None)
-
-            while a := fin.readline():   # Allow blank lines
-                a = a.rstrip()  # Drop ending whitespace
-                if a and a=='=':   # Detect closing =
-                    # Process the SCAD file (file is fully written when this returns)
-                    bbox = process(idata, ofile, custom_colors)
-
-                    # Generate PNG if requested
-                    if options['png']:
-                        # Use default border if not specified
-                        final_border = border if border is not None else 0
-
-                        # Calculate camera/imgsize from bounding box (always with 0 border for tight fit)
-                        # Border is applied later via ImageMagick trim+border
-                        # Pass imgsize if specified so z_height can be calculated to fit
-                        calc_camera, calc_imgsize = calculate_camera_params(
-                            bbox, border=0, target_imgsize=imgsize
-                        )
-
-                        # Use explicit camera if provided, otherwise use calculated
-                        final_camera = camera if camera else calc_camera
-                        final_imgsize = imgsize if imgsize else calc_imgsize
-
-                        # Print calculated values for user reference
-                        if border is None:
-                            print(f"Calculated border: @border={final_border}")
-                        if not camera:
-                            print(f"Calculated camera: @camera={calc_camera[0]:.1f},{calc_camera[1]:.1f},{calc_camera[2]:.1f}")
-                        if not imgsize:
-                            print(f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}")
-
-                        generate_png(ofile, final_imgsize, final_camera, final_border)
-                    break
-                elif a.startswith('@imgsize='):
-                    # Parse @imgsize=800,250
-                    parts = a[9:].split(',')
-                    if len(parts) == 2:
-                        try:
-                            imgsize = (int(parts[0]), int(parts[1]))
-                        except ValueError:
-                            print(f"Warning: Invalid imgsize format: {a}")
-                elif a.startswith('@camera='):
-                    # Parse @camera=150,50,250
-                    parts = a[8:].split(',')
-                    if len(parts) == 3:
-                        try:
-                            camera = (float(parts[0]), float(parts[1]), float(parts[2]))
-                        except ValueError:
-                            print(f"Warning: Invalid camera format: {a}")
-                elif a.startswith('@border='):
-                    # Parse @border=20
+    # Parse global options (before first diagram)
+    global_options = {}
+    with open(options['file'], 'r') as fin:
+        # First pass: read global options (lines before first =)
+        while True:
+            pos = fin.tell()  # Save position before reading
+            a = fin.readline()
+            if not a:  # EOF
+                break
+            if a[0] == '=':
+                # Found first diagram, go back to this line
+                fin.seek(pos)
+                break
+            # Parse global options
+            a = a.rstrip()
+            if a.startswith('@imgsize='):
+                parts = a[9:].split(',')
+                if len(parts) == 2:
                     try:
-                        border = float(a[8:])
+                        global_options['imgsize'] = (int(parts[0]), int(parts[1]))
                     except ValueError:
-                        print(f"Warning: Invalid border format: {a}")
-                elif a.startswith('@colors='):
-                    # Parse @colors=Red,Blue,Green,#FF00FF,...
+                        print(f"Warning: Invalid global imgsize format: {a}")
+            elif a.startswith('@camera='):
+                parts = a[8:].split(',')
+                if len(parts) == 3:
                     try:
-                        color_string = a[8:].strip()
-                        if color_string:
-                            custom_colors = [c.strip() for c in color_string.split(',')]
-                        else:
+                        global_options['camera'] = (float(parts[0]), float(parts[1]), float(parts[2]))
+                    except ValueError:
+                        print(f"Warning: Invalid global camera format: {a}")
+            elif a.startswith('@border='):
+                try:
+                    global_options['border'] = float(a[8:])
+                except ValueError:
+                    print(f"Warning: Invalid global border format: {a}")
+            elif a.startswith('@colors='):
+                try:
+                    color_string = a[8:].strip()
+                    if color_string:
+                        global_options['colors'] = [c.strip() for c in color_string.split(',')]
+                except Exception as e:
+                    print(f"Warning: Invalid global colors format: {a} - {e}")
+
+        # Second pass: process diagrams
+        while a := fin.readline():
+            # Read text for one diagram; send that text to process().
+            if a[0]=='=':           # Detect opening =
+                idata, ofile = [], a[1:].rstrip()
+                # Initialize with global defaults
+                imgsize = global_options.get('imgsize', None)
+                camera = global_options.get('camera', None)
+                border = global_options.get('border', None)
+                custom_colors = global_options.get('colors', None)
+
+                while a := fin.readline():   # Allow blank lines
+                    a = a.rstrip()  # Drop ending whitespace
+                    if a and a=='=':   # Detect closing =
+                        # Process the SCAD file (file is fully written when this returns)
+                        bbox = process(idata, ofile, custom_colors, options)
+
+                        # Generate PNG if requested
+                        if options['png']:
+                            # Use default border if not specified
+                            final_border = border if border is not None else 0
+
+                            # Calculate camera/imgsize from bounding box (always with 0 border for tight fit)
+                            # Border is applied later via ImageMagick trim+border
+                            # Pass imgsize if specified so z_height can be calculated to fit
+                            calc_camera, calc_imgsize = calculate_camera_params(
+                                bbox, border=0, target_imgsize=imgsize
+                            )
+
+                            # Use explicit camera if provided, otherwise use calculated
+                            final_camera = camera if camera else calc_camera
+                            final_imgsize = imgsize if imgsize else calc_imgsize
+
+                            # Print calculated values for user reference
+                            if border is None:
+                                print(f"Calculated border: @border={final_border}")
+                            if not camera:
+                                print(f"Calculated camera: @camera={calc_camera[0]:.1f},{calc_camera[1]:.1f},{calc_camera[2]:.1f}")
+                            if not imgsize:
+                                print(f"Calculated imgsize: @imgsize={calc_imgsize[0]},{calc_imgsize[1]}")
+
+                            generate_png(ofile, final_imgsize, final_camera, final_border)
+                        break
+                    elif a.startswith('@imgsize='):
+                        # Parse @imgsize=800,250
+                        parts = a[9:].split(',')
+                        if len(parts) == 2:
+                            try:
+                                imgsize = (int(parts[0]), int(parts[1]))
+                            except ValueError:
+                                print(f"Warning: Invalid imgsize format: {a}")
+                    elif a.startswith('@camera='):
+                        # Parse @camera=150,50,250
+                        parts = a[8:].split(',')
+                        if len(parts) == 3:
+                            try:
+                                camera = (float(parts[0]), float(parts[1]), float(parts[2]))
+                            except ValueError:
+                                print(f"Warning: Invalid camera format: {a}")
+                    elif a.startswith('@border='):
+                        # Parse @border=20
+                        try:
+                            border = float(a[8:])
+                        except ValueError:
+                            print(f"Warning: Invalid border format: {a}")
+                    elif a.startswith('@colors='):
+                        # Parse @colors=Red,Blue,Green,#FF00FF,...
+                        try:
+                            color_string = a[8:].strip()
+                            if color_string:
+                                custom_colors = [c.strip() for c in color_string.split(',')]
+                            else:
+                                custom_colors = None
+                        except Exception as e:
+                            print(f"Warning: Invalid colors format: {a} - {e}")
                             custom_colors = None
-                    except Exception as e:
-                        print(f"Warning: Invalid colors format: {a} - {e}")
-                        custom_colors = None
-                else:
-                    idata.append(a)
+                    else:
+                        idata.append(a)
+
+if __name__ == "__main__":
+    main()

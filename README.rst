@@ -19,14 +19,14 @@ graphs into OpenSCAD files and PNG images with transparent backgrounds:
 
 **drawNodesLabeled.py** - Edge labeling with font styling
   Adds edge labels (lowercase letters) at both output and input positions,
-  with bold/italic font styling, white halos for readability, node outlines,
+  with bold/italic font styling, transparent halos for readability, node outlines,
   addition symbols, arrowheads, and complement circles on second outputs.
 
 **drawProgression.py** - Progression/state-transition diagrams
   Specialized for showing state progressions with path tracing, downward
   arrows at inputs, and diagonal flow indicators for data flow visualization.
 
-All three programs read ASCII graphics drawn with ``/ # \ _ X`` and space
+All three programs read ASCII graphics drawn with ``/ | # \ _ X`` and space
 characters, and write .scad files using OpenSCAD 2D graphics extruded to 3D.
 Lines containing characters other than the drawing characters are treated as
 text lines, and may be displayed or not in output, depending on command-line
@@ -68,11 +68,11 @@ Software requirements
  • Install OpenSCAD per its instructions
  • Install ImageMagick (provides the ``convert`` command) for automatic PNG
    generation with transparent backgrounds
- • Install a picture viewer (such as gpicview, eog, xv, etc)
+ • Install a picture viewer if necessary (such as gpicview, eog, xv, etc)
 
 Running the program
 ====================
-  
+
 When you run the program to process an input file, it will write SCAD
 code to a file or files, as named by *=filename* lines within the
 input.  If the run is successful, you can then use openscad to display
@@ -99,14 +99,22 @@ include::
 
   Red   BC0000   Green   00FF00   Blue   0000FF20
 
-Defaults for *node, loci, text* are **0000FF20, Red, ''** (the latter
-an empty string) to turn on **pale blue** *node* coloring; turn on
-**Red** *loci* numbers; and turn off *text* display.  (Generally, use
-an empty-string value **''** to turn off an option.  Eg, ``loci=''``
-would suppress loci numbering.)
+Defaults for *node, loci, text* are:
 
-The default value for the *file* option is ``aTestSet``, which is a
-file of test examples.  Note, a bare value is treated as a file name,
+ • **drawNodes.py**: **0000FF20, Red, ''** (pale blue nodes, red loci numbers, no text)
+ • **drawNodesLabeled.py**: **0000FF20, '', ''** (pale blue nodes, no loci numbers, no text)
+ • **drawProgression.py**: Does not use these options
+
+Generally, use an empty-string value **''** to turn off an option.
+Eg, ``loci=''`` would suppress loci numbering.
+
+The default value for the *file* option depends on which program you're running:
+
+ • **drawNodes.py**: ``validation/draw_nodes/basic_test_set.txt``
+ • **drawNodesLabeled.py**: ``validation/draw_nodes_labeled/labeled_test_set.txt``
+ • **drawProgression.py**: ``validation/draw_progression/progression.txt``
+
+These are test example files.  Note, a bare value is treated as a file name,
 *ie*, is treated like file=value.  For example, ``drawNodes.py
 myfile`` reads data from myfile with other options defaulted.
 
@@ -114,14 +122,14 @@ myfile`` reads data from myfile with other options defaulted.
 Command-line Option Examples
 ===============================
 
-Two example command lines appear below.  The first reads from bigdata,
+Two example command lines appear below.  The first reads from the default test file,
 draws text lines in beige, loci numbers in green, and suppresses
 nodes.  The second draws loci numbers in red on a pale green
 background (since 00ff0010 is solid green, 0x00ff00, but at
 alpha=0x10) with text lines suppressed::
 
-  drawNodes.py bigdata text=beige loci=green node=''
-  drawNodes.py bigdata loci=red node=00ff0010
+  drawNodes.py validation/draw_nodes/basic_test_set.txt text=beige loci=green node=''
+  drawNodes.py validation/draw_nodes/basic_test_set.txt loci=red node=00ff0010
 
 Automatic PNG Generation
 =========================
@@ -212,9 +220,9 @@ Input File Formats
 In the input file, separate graphs are demarcated by an *=* line at
 each section end, and an *=f* line at each section start (where *f* is
 some output file name, to which *.scad* will be appended).  See file
-``aTestSet`` for examples of input file format.  Generally, the lines
+``validation/draw_nodes/basic_test_set.txt`` for examples of input file format.  Generally, the lines
 between the opening *=f* line and the closing *=* line should
-represent a graph using any of ``/ # \ _ X`` and space to draw the
+represent a graph using any of ``/ | # \ _ X`` and space to draw the
 graph.  Lines that have characters other than these are treated as
 lines of text.  If no text color is set, text lines are ignored.  But
 if a color is set via the ``text=color`` command-line option, text
@@ -223,10 +231,11 @@ lines will appear in the output along with the graph drawing.
 Note, *k* consecutive ``#`` characters represent a digraph node of
 width *k*, which may have up to *k* output loci atop the node, and up
 to *k* input loci on the underside.  In the following sample of
-program input and resulting output, run with default options, the
-green trace represents an edge *from* 0 on the first node, *to* 1 on
-the same node; and the blue trace is similar, running *from* 2 *to* 3
-on the second node::
+program input and resulting output, run with ``drawNodes.py`` using default
+options, the green trace represents an edge *from* 0 on the first node, *to* 1
+on the same node; and the blue trace is similar, running *from* 2 *to* 3 on
+the second node. (Note: ``drawNodesLabeled.py`` uses letter labels at edge
+endpoints instead of these numeric loci—see `Font Styling in drawNodesLabeled.py`_)::
 
     =235small
          __________
@@ -237,8 +246,8 @@ on the second node::
           \________/
     =
 
-.. image:: 235small.png
-   :scale: 35%
+.. image:: validation/draw_nodes/235small.png
+   :width: 400px
 
 X-marks and Trace Colors
 ========================
@@ -309,9 +318,10 @@ second output gets #E31A1C (red), and so on from left to right.
 Font Styling in drawNodesLabeled.py
 ====================================
 
-The ``drawNodesLabeled.py`` program uses edge labels (lowercase letters) to track
-data flow through the graph. Labels appear at both the output position (above
-the source node) and input position (at the destination). Font styling distinguishes
+Unlike ``drawNodes.py`` which displays numeric loci (0, 1, 2...) inside nodes,
+``drawNodesLabeled.py`` uses lowercase letter labels (a, b, c...) positioned at
+edge endpoints to track data flow through the graph. Labels appear at both the
+output position (above the source node) and input position (at the destination). Font styling distinguishes
 different output types and data flow paths:
 
 **Output Labels** (above nodes)
@@ -326,9 +336,11 @@ different output types and data flow paths:
   • Displayed in grey with same bold/bold-italic styling as used outputs
 
 **Label Halos**
-  All labels include white outlines (halos) for readability when labels appear
-  over dark-colored edges. The halo color is ``[1.0, 1.0, 1.0]`` (white) and
-  can be customized via OpenSCAD's Customizer (``label_halo_color`` parameter).
+  All labels include outline halos for readability when labels appear over
+  dark-colored edges. In the .scad file, the halo color is ``[1.0, 1.0, 1.0]``
+  (white) and can be customized via OpenSCAD's Customizer (``label_halo_color``
+  parameter). In PNG output, the white halos become transparent since white is
+  converted to transparent during background removal.
 
 This font styling system allows you to trace data flow visually: if you see an
 italic input label, you know it came from an out2 (complemented) output.
@@ -340,7 +352,7 @@ Visual Elements in drawNodesLabeled.py
   Black borders around all nodes for visual definition
 
 **Addition Symbols (+)**
-  Plus symbols in the center of each node indicate the addition/XOR operation
+  Plus symbols in the center of each node indicate the addition operation
 
 **Arrowheads at Inputs**
   Upward-pointing triangular arrows show where edges terminate at node inputs.
@@ -379,10 +391,10 @@ data flow progressions with these visual indicators:
 Graph Parsing Limitations
 =========================
 
-An example in ``aTestSet`` called *234etc* has some traces that
+An example in ``validation/draw_nodes/basic_test_set.txt`` called *234etc* has some traces that
 ``drawNodes`` doesn't handle correctly.  The parsing method used in the
 program is simplistic; it is ok for many ascii graphs but at present
-fails when a trace goes down, then left or right, then down again,
+fails when a trace is downward slanting, then left or right, then down again,
 because the second corner's / or \\ is in a different line than the
 first corner's / or \\ and the current version only looks in current
 line.  This may or may not be simple to fix.  In addition, hairpin
@@ -420,12 +432,12 @@ Note: Manual exports do not automatically apply transparent backgrounds. For
 transparent backgrounds, use automatic PNG generation or post-process with
 ImageMagick::
 
-  convert input.png -fuzz 5% -transparent 'rgb(255,255,229)' \\
+  convert input.png -fuzz 5% -transparent 'rgb(255,255,229)' \
     -transparent 'rgb(202,198,198)' -trim output.png
 
-Automatic updates in OpenSCAD 
+Automatic updates in OpenSCAD
 ========================================
-  
+
 If OpenSCAD's ``Design / Automatic-Reload-and-Preview`` option is on,
 then once you've started OpenSCAD for a given file, it will notice
 whenever that ``.scad`` file changes, and will re-render the image.

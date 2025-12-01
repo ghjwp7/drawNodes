@@ -12,7 +12,7 @@
 # value is an input file name or is a color name or number (6-digit
 # hex RGB or 8-digit hex RGBA).  See README.rst for examples.
 
-# Note, default for `file` is 'aTestSet', which is a file of test
+# Note, default for `file` is 'validation/draw_nodes/basic_test_set.txt', which is a file of test
 # examples.  Note, a bare value is treated like file=value.  For
 # example, "drawNodes myfile" reads data from myfile with other
 # options defaulted.
@@ -82,7 +82,7 @@ class Junction:
         return f' {self.num:2} {self.row:2} {self.col:2} {self.cc[self.code]}'
     def __repr__(self): return f'{str(self)} {[str(c) for c in self.conn]}'
 #==============================================================
-def process(idata, ofile, custom_colors=None):
+def process(idata, ofile, custom_colors=None, options=None):
     UR, LR, UL, LL, CL, XM, HM, HX = range(8) # Set Corner & Mark Codes
     def upChar(dx):   # Return neighbor char from previous line
         if linn>0 and (0<= col+dx < len(idata[linn-1])):
@@ -262,36 +262,40 @@ def process(idata, ofile, custom_colors=None):
         # Close drawStuff module and invoke it
         fout.write ('}\ndrawStuff();\n')
 #======================================================================
-# Set up default options to number the loci in red; suppress text;
-# paint node bodies in a pale blue; and by default read from t1-data.
-options = { 'loci':'Red', 'text':'', 'node':'0000FF20', 'file':'aTestSet'}
-arn, idata = 0, []
-while (arn := arn+1) < len(argv):
-    if '=' in argv[arn]:
-        opt, val = argv[arn].split('=')
-        options[opt] = val
-    else: options['file'] = argv[arn] # Default case = file name
-with open(options['file'], 'r') as fin:
-    while a := fin.readline():
-        # Read text for one diagram; send that text to process().
-        if a[0]=='=':           # Detect opening =
-            idata, ofile = [], a[1:].rstrip()
-            custom_colors = None
-            while a := fin.readline():   # Allow blank lines
-                a = a.rstrip()  # Drop ending whitespace
-                if a and a=='=':   # Detect closing =
-                    process(idata, ofile, custom_colors)
-                    break
-                elif a.startswith('@colors='):
-                    # Parse @colors=Red,Blue,Green,#FF00FF,...
-                    try:
-                        color_string = a[8:].strip()
-                        if color_string:
-                            custom_colors = [c.strip() for c in color_string.split(',')]
-                        else:
+def main():
+    # Set up default options to number the loci in red; suppress text;
+    # paint node bodies in a pale blue; and by default read from t1-data.
+    options = { 'loci':'Red', 'text':'', 'node':'0000FF20', 'file':'validation/draw_nodes/basic_test_set.txt'}
+    arn, idata = 0, []
+    while (arn := arn+1) < len(argv):
+        if '=' in argv[arn]:
+            opt, val = argv[arn].split('=')
+            options[opt] = val
+        else: options['file'] = argv[arn] # Default case = file name
+    with open(options['file'], 'r') as fin:
+        while a := fin.readline():
+            # Read text for one diagram; send that text to process().
+            if a[0]=='=':           # Detect opening =
+                idata, ofile = [], a[1:].rstrip()
+                custom_colors = None
+                while a := fin.readline():   # Allow blank lines
+                    a = a.rstrip()  # Drop ending whitespace
+                    if a and a=='=':   # Detect closing =
+                        process(idata, ofile, custom_colors, options)
+                        break
+                    elif a.startswith('@colors='):
+                        # Parse @colors=Red,Blue,Green,#FF00FF,...
+                        try:
+                            color_string = a[8:].strip()
+                            if color_string:
+                                custom_colors = [c.strip() for c in color_string.split(',')]
+                            else:
+                                custom_colors = None
+                        except Exception as e:
+                            print(f"Warning: Invalid colors format: {a} - {e}")
                             custom_colors = None
-                    except Exception as e:
-                        print(f"Warning: Invalid colors format: {a} - {e}")
-                        custom_colors = None
-                else:
-                    idata.append(a)
+                    else:
+                        idata.append(a)
+
+if __name__ == "__main__":
+    main()
