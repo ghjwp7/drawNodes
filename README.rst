@@ -366,6 +366,9 @@ Visual Elements in drawNodesLabeled.py
 **X Marks**
   Grey "X" characters mark input positions, matching the color of unused outputs
 
+.. image:: validation/draw_nodes_labeled/4_2_1_auto.png
+   :width: 600px
+
 Visual Elements in drawProgression.py
 ======================================
 
@@ -387,6 +390,9 @@ data flow progressions with these visual indicators:
 
 **Unconnected Inputs**
   Inputs marked with 'x' in the ASCII diagram remain unconnected in the output.
+
+.. image:: validation/draw_progression/4_2_1_progression.png
+   :width: 600px
 
 Graph Parsing Limitations
 =========================
