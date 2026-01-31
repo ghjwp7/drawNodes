@@ -34,9 +34,14 @@ Homepage = "https://github.com/stuartsquires/drawNodes"
 Repository = "https://github.com/stuartquires/drawNodes"
 
 [project.scripts]
+# Lowercase with hyphens (standard Python CLI convention)
 drawnodes = "drawnodes.draw_nodes:main"
 drawnodes-labeled = "drawnodes.draw_nodes_labeled:main"
 drawprogression = "drawnodes.draw_progression:main"
+# CamelCase aliases (matching README documentation)
+drawNodes = "drawnodes.draw_nodes:main"
+drawNodesLabeled = "drawnodes.draw_nodes_labeled:main"
+drawProgression = "drawnodes.draw_progression:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "black", "mypy", "restview"]
